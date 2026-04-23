@@ -219,18 +219,16 @@ __pychcahe__/
 *.pyc
 .ipynb_checkpoints/
 
-#os
-.DS_Store
-
 #Data
 data/raw/
 data/processed/
 data/predictions/
 
-#modelos
-models/
-*.pkl
-*.joblib
+#logs 
+logs/
+#os
+.DS_Store
 
-#MLFLOW
-mlflow/
+
+
+
