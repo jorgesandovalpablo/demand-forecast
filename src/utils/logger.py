@@ -1,49 +1,58 @@
-import logging 
+import logging
 import sys
 from pathlib import Path
 from datetime import datetime
 
-def get_logger(name:str) -> logging.Logger:
+
+def get_logger(name: str) -> logging.Logger:
     """
-    Crear y retorna lkogger configurado para el modulo solicitado
+    Crea y retorna un logger configurado para el módulo
+    que lo solicita.
 
-    parametros: 
-        name: nombre del modulo
+    Parámetros:
+        name: nombre del módulo, usualmente __name__
 
-    uso:
-        from scr.utils.logger import get_logger(__name__)
+    Retorna:
+        logger configurado con handlers de consola y archivo
+
+    Uso:
+        from src.utils.logger import get_logger
         logger = get_logger(__name__)
-        logger.info("cargando acrhivos")
-        logger.warning("nulos detectados)
-        logger.error("archivo no encontrado")
+        logger.info("Cargando datos...")
+        logger.warning("Nulos detectados")
+        logger.error("Archivo no encontrado")
     """
 
-    #crear path
+    # Crear carpeta de logs si no existe
     logs_dir = Path("logs")
     logs_dir.mkdir(exist_ok=True)
 
-    #nombre y fecha
+    # Nombre del archivo de log con fecha
     log_file = logs_dir / f"{datetime.now().strftime('%Y-%m-%d')}.log"
 
-    #crear logger
+    # Crear logger
     logger = logging.getLogger(name)
 
+    # Evitar duplicar handlers si el logger ya existe
     if logger.handlers:
         return logger
-    
-    #formato
+
+    logger.setLevel(logging.DEBUG)
+
+    # Formato del mensaje
     formatter = logging.Formatter(
         fmt="%(asctime)s | %(levelname)-8s | %(name)-20s | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S"
     )
 
-    #Handler 1 
-    console_handler =  logging.StreamHandler(sys.stdout)
+    # Handler 1 — Consola (INFO y superior)
+    console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(formatter)
 
-    #Handler 2
-    file_handler =  logging.FileHandler(log_file, encoding='utf-8')
+    # Handler 2 — Archivo (DEBUG y superior)
+    # Guarda todo, incluyendo mensajes de debug detallados
+    file_handler = logging.FileHandler(log_file, encoding='utf-8')
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
 
@@ -51,6 +60,4 @@ def get_logger(name:str) -> logging.Logger:
     logger.addHandler(file_handler)
 
     return logger
-
-
 
