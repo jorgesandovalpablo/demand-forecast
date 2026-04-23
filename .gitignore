@@ -221,3 +221,16 @@ __pychcahe__/
 
 #os
 .DS_Store
+
+#Data
+data/raw/
+data/processed/
+data/predictions/
+
+#modelos
+models/
+*.pkl
+*.joblib
+
+#MLFLOW
+mlflow/
