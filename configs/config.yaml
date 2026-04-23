@@ -12,9 +12,14 @@ paths:
 data:
   target: "sales"
   date_col: "date"
+  n_stores: 54
+  n_families: 33
+  n_series: 1782
+  date_start: "2013-01-01"
+  date_end: "2017-08-15"
   group_cols:
     - "store_nbr"
-    - "familia"
+    - "family"
   categorical_cols:
     - "city"
     - "state"
@@ -22,6 +27,9 @@ data:
     - "cluster"
     - "family"
     - "locale"
+  family_segments:
+    high_frequency_treshold: 0.30
+    low_frequency_treshold: 0.50
 
 model:
   horizon_diario: 7

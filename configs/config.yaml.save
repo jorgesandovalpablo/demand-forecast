@@ -1,0 +1,54 @@
+project:
+  name: "demand-forecast"
+  seed: 42
+  version: "0.1.0"
+
+paths:
+  data_raw: "data/raw/"
+  data_processed: "data/processed/features.parquet"
+  data_predictions: "data/predictions/"
+  models: "models/"
+
+data:
+  target: "sales"
+  date_col: "date"
+  group_cols:
+    - "store_nbr"
+    - "familily"
+  categorical_cols:
+    - "city"
+    - "state"
+    - "tipe"
+    - "cluster"
+    -
+    - "locale"
+
+model:
+  horizon_diario: 7
+  horizon_mensual: 30
+  params_lgbm_diario:
+    n_estimators: 1000
+    learning_rate: 0.05
+    num_leaves: 31
+    max_bin: 63
+    min_data_in_leaf: 100
+    random_state: 42
+    n_jobs: 2
+    verbosity: -1
+  params_lgbm_mensual:
+    n_estimators: 800
+    learning_rate: 0.05
+    num_leaves: 31
+    max_bin: 63
+    min_data_in_leaf: 100
+    random_state: 42
+    n_jobs: 2
+    verbosity: -1
+
+training:
+  test_size_weeks: 8
+  n_folds: 5
+
+mlflow:
+  experiment_name: "demand-forecast"
+  tracking_uri: "https://dagshub.com/tu-usuario/demand-forecast.mlflow"
