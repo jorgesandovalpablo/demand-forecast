@@ -43,8 +43,15 @@ def setup_mlflow() -> None:
     en DagsHub.
     """
     from dotenv import load_dotenv
+    import os
     load_dotenv()
 
+    os.environ['MLFLOW_TRACKING_USERNAME'] = (
+        os.getenv('MLFLOW_TRACKING_USERNAME','')
+    )
+    os.environ['MLFLOW_TRACKING_PASSWORD'] = (
+        os.getenv('MLFLOW_TRACKING_PASSWORD','')
+    )
     tracking_uri = config['mlflow']['tracking_uri']
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(config['mlflow']['experiment_name'])
@@ -324,7 +331,7 @@ def run_training(horizon: int) -> dict:
         mlflow.log_artifact(str(model_path))
 
         logger.info("=" * 50)
-        logger.info("✅ Entrenamiento completado")
+        logger.info(" Entrenamiento completado")
         logger.info(
             f"  RMSE:  {summary.rmse_mean:.4f} "
             f"(±{summary.rmse_std:.4f})"
