@@ -9,63 +9,68 @@ logger = get_logger(__name__)
 # --------------------------------
 # Merge Holidays
 # --------------------------------
-
-def _process_holidays(holidays:pd.DataFrame) -> tuple:
+def _process_holidays(holidays: pd.DataFrame) -> tuple:
     """
-    Separa holidays por locale para el merge
-    evitando duplicados.
+    Separa holidays por locale para hacer
+    el merge correcto y evitar duplicados.
 
     Retorna:
-        tuple: (National_df, regional_df, local_df)
+        tuple: (national_df, regional_df, local_df)
     """
     logger.info("Processando holidays...")
 
+    # ── Nacional ──
     national = (
-        holidays[holidays['locale']== 'National']
+        holidays[holidays['locale'] == 'National']
         .sort_values('transferred')
         .drop_duplicates(subset=['date'])
-        [['date','type','locale',
-          'description','transferred']]
+        [['date', 'type', 'locale',
+          'description', 'transferred']]
         .rename(columns={
-            'type':         'holiday_type',
-            'description':  'holiday_descrition'
+            'type':        'holiday_type',
+            'description': 'holiday_description',
+            'locale':      'holiday_locale'
         })
     )
 
+    # ── Regional ──
+    # locale_name en holidays = state en stores
     regional = (
-        holidays[holidays['locale']== ' Regional']
+        holidays[holidays['locale'] == 'Regional']
         .sort_values('transferred')
-        .drop_duplicates(subset=['date','locale_name'])
-        [['date','locale_name','type',
-          'description','transferred']]
+        .drop_duplicates(subset=['date', 'locale_name'])
+        [['date', 'locale_name', 'locale',
+          'type', 'description', 'transferred']]
         .rename(columns={
-            'type':         'holiday_type',
-            'locale_name':   'state',
-            'description':  'holiday_descrition'
+            'type':        'holiday_type',
+            'locale_name': 'state',         # ← clave del fix
+            'description': 'holiday_description',
+            'locale':      'holiday_locale'
         })
     )
 
+    # ── Local ──
+    # locale_name en holidays = city en stores
     local = (
         holidays[holidays['locale'] == 'Local']
         .sort_values('transferred')
         .drop_duplicates(subset=['date', 'locale_name'])
-        [['date', 'locale_name', 'type',
-          'description', 'transferred']]
+        [['date', 'locale_name', 'locale',
+          'type', 'description', 'transferred']]
         .rename(columns={
             'type':        'holiday_type',
-            'locale_name': 'city',
-            'description': 'holiday_description'
+            'locale_name': 'city',          # ← clave del fix
+            'description': 'holiday_description',
+            'locale':      'holiday_locale'
         })
     )
 
     logger.info(
-        f"Ncional: {len(national)} registros |"
-        f"Regional {len(regional)} |"
+        f"Nacional: {len(national)} registros | "
+        f"Regional {len(regional)} | "
         f"Local: {len(local)}"
     )
-
-    return national, regional, local 
-
+    return national, regional, local
 # -----------------------
 # Merge principal
 # -----------------------
@@ -98,17 +103,23 @@ def _merge_datasets(df: pd.DataFrame,
     )
     logger.info(f"  Post merge transactions: {df.shape}")
 
+
     # 4. Holidays — merge diferenciado por locale
+# 4. Holidays — merge diferenciado por locale
     national, regional, local = _process_holidays(holidays)
 
+    # ── Merge Nacional → por date ──
     df = df.merge(national, on='date', how='left')
+
+    # ── Merge Regional → por date + state ──
     df = df.merge(
         regional,
-        on=['date','state'],
+        on=['date', 'state'],
         how='left',
-        suffixes=('','_regional')
+        suffixes=('', '_regional')
     )
 
+    # ── Merge Local → por date + city ──
     df = df.merge(
         local,
         on=['date', 'city'],
@@ -116,20 +127,32 @@ def _merge_datasets(df: pd.DataFrame,
         suffixes=('', '_local')
     )
 
-    for col in ['dolifay_type','holiday_dexcription',
-                      'transfered']:
-        local_col = f"{col}_local" 
+    # ── Consolidar columnas ──
+    # Prioridad: local > regional > nacional
+    for col in ['holiday_type', 'holiday_description',
+                'holiday_locale', 'transferred']:
+        local_col    = f"{col}_local"
         regional_col = f"{col}_regional"
 
-        if local_col in df.columns:
+        # Solo consolidar si existen las columnas
+        has_local    = local_col    in df.columns
+        has_regional = regional_col in df.columns
+
+        if has_local and has_regional:
             df[col] = (
                 df[local_col]
-                .fillna(df.get(regional_col, np.nan))
+                .fillna(df[regional_col])
+                .fillna(df[col])
             )
-    
+        elif has_local:
+            df[col] = df[local_col].fillna(df[col])
+        elif has_regional:
+            df[col] = df[regional_col].fillna(df[col])
+
+    # ── Limpiar columnas intermedias ──
     cols_to_drop = [
         c for c in df.columns
-        if '_regional' in c or '_local' in c 
+        if c.endswith('_regional') or c.endswith('_local')
     ]
     df = df.drop(columns=cols_to_drop)
 
