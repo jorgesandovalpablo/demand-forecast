@@ -1,6 +1,5 @@
 import pandas as pd
 from pathlib import Path
-from sklearn.preprocessing import LabelEncoder
 from src.utils.logger import get_logger
 from src.utils.config import config
 
@@ -479,7 +478,7 @@ def build_features(df: pd.DataFrame,
         logger.info(f"Guardado: {filepath}")
 
     logger.info("=" * 50)
-    logger.info(f" Feature engineering completado")
+    logger.info(" Feature engineering completado")
     logger.info(f"  Shape final: {df.shape}")
     logger.info(f"  Features:    {len(df.columns)} columnas")
     logger.info("=" * 50)

@@ -207,9 +207,8 @@ marimo/_lsp/
 __marimo__/
 
 #modelo entrenados 
-models/
-*.pkl
-*.joblib
+models/*.pkl
+models/*.joblib
 
 #mlfllow
 mlflow/

@@ -53,6 +53,27 @@ model:
     n_jobs: 2
     verbosity: -1
 
+features:
+  holiday_impact:
+    positive:
+      - "Navidad"
+      - "Dia de la Madre"
+      - "Carnaval"
+      - "Dia del Trabajo"
+      - "Independencia de Cuenca"
+      - "Fundacion de Quito"
+      - "Mundial"
+      - "Dia de Difuntos"
+    negative:
+      - "Primer dia del ano"
+      - "Traslado"
+      - "Black Friday"
+      - "Cyber Monday"
+      - "Puente"
+      - "Recupero"
+    atypical:
+      - "Terremoto"
+
 training:
   test_size_weeks: 8
   n_folds: 5
