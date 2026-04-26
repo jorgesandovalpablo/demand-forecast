@@ -47,7 +47,7 @@ SCHEMAS =  {
             "city":             "object",
             "state":            "object",
             "type":             "object",
-            "cluester":         "int64"          
+            "cluster":         "int64"          
         },
         "parse_dates":[]
     },
