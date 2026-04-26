@@ -80,4 +80,4 @@ training:
 
 mlflow:
   experiment_name: "demand-forecast"
-  tracking_uri: "https://dagshub.com/jorgesandovalpablo/demand-forecast.git"
+  tracking_uri: "https://dagshub.com/jorgesandovalpablo/demand-forecast"
