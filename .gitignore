@@ -226,6 +226,10 @@ data/predictions/
 
 #logs 
 logs/
+
+#auxiliar test  
+test_build_festures.py
+
 #os
 .DS_Store
 
