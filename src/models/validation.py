@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import Path
 from dataclasses import dataclass, field
 from typing import Generator
 from src.utils.logger import get_logger
@@ -196,6 +197,7 @@ def compute_metrics(
     }
 
 
+
 # ─────────────────────────────────────────
 # 3. Reporte de resultados
 # ─────────────────────────────────────────
@@ -281,6 +283,13 @@ def plot_folds(
     plt.tight_layout()
 
     if save_path:
-        plt.savefig(save_path, dpi=150)
-        logger.info(f"Gráfica guardada: {save_path}")
+        try:
+            Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+            plt.savefig(save_path, dpi=150)
+            logger.info(f"Gráfica guardada: {save_path}")
+        except Exception as e:
+            logger.warning(f"No se pudo guardar la gráfica de folds: {e}")
+            logger.info("Continuando con el entrenamiento del modelo final...")
+
+
     plt.show()
