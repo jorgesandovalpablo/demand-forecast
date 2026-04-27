@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import Path
+from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Generator
 from src.utils.logger import get_logger
@@ -28,6 +28,7 @@ class FoldResult:
     rmsle:       float = 0.0
     n_train:     int   = 0
     n_val:       int   = 0
+    wape:        float = 0.0
 
 
 @dataclass
@@ -45,6 +46,8 @@ class ValidationResult:
     mape_std:     float = 0.0
     rmsle_mean:   float = 0.0
     rmsle_std:    float = 0.0
+    wape_mean:    float = 0.0
+    wape_std:     float = 0.0
 
 
 # ─────────────────────────────────────────
@@ -182,6 +185,13 @@ def compute_metrics(
         if mask.sum() > 0 else np.nan
     )
 
+    # WAPE — Ideal para demanda intermitente y grandes volúmenes mezclados
+    total_actual = np.sum(y_true)
+    if total_actual > 0:
+        wape = (np.sum(np.abs(y_true - y_pred)) / total_actual) * 100
+    else:
+        wape = np.nan
+
     # RMSLE — robusto con distribuciones sesgadas
     rmsle = np.sqrt(
         np.mean(
@@ -193,7 +203,8 @@ def compute_metrics(
         'rmse':  round(float(rmse),  4),
         'mae':   round(float(mae),   4),
         'mape':  round(float(mape),  4),
-        'rmsle': round(float(rmsle), 4)
+        'rmsle': round(float(rmsle), 4),
+        'wape':  round(float(wape),  4)
     }
 
 
@@ -210,7 +221,7 @@ def summarize_validation(
     """
     summary = ValidationResult(folds=results)
 
-    for metric in ['rmse', 'mae', 'mape', 'rmsle']:
+    for metric in ['rmse', 'mae', 'mape', 'rmsle','wape']:
         values = [getattr(r, metric) for r in results]
         setattr(summary, f'{metric}_mean', round(np.mean(values), 4))
         setattr(summary, f'{metric}_std',  round(np.std(values),  4))
@@ -234,6 +245,10 @@ def summarize_validation(
         f"  RMSLE: {summary.rmsle_mean:.4f} "
         f"(±{summary.rmsle_std:.4f})"
     )
+    logger.info(
+        f"  WAPE: {summary.wape_mean:.4f} "
+        f"(±{summary.wape_std:.4f})"
+    )
     logger.info("=" * 50)
 
     return summary
@@ -252,9 +267,9 @@ def plot_folds(
     """
     import matplotlib.pyplot as plt
 
-    fig, axes = plt.subplots(2, 2, figsize=(14, 8))
-    metrics = ['rmse', 'mae', 'mape', 'rmsle']
-    colors  = ['steelblue', 'coral', 'seagreen', 'purple']
+    fig, axes = plt.subplots(2, 3, figsize=(18, 8))
+    metrics = ['rmse', 'mae', 'mape', 'rmsle','wape']
+    colors  = ['steelblue', 'coral', 'seagreen', 'purple','orange']
 
     for ax, metric, color in zip(
         axes.flatten(), metrics, colors
