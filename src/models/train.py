@@ -124,14 +124,16 @@ def _train_fold(
         rmse        = metrics['rmse'],
         mae         = metrics['mae'],
         mape        = metrics['mape'],
-        rmsle       = metrics['rmsle']
+        rmsle       = metrics['rmsle'],
+        wape        = metrics['wape']
     )
 
     logger.info(
         f"  Fold {fold_info['fold']} → "
         f"RMSE: {metrics['rmse']:.4f} | "
         f"MAE: {metrics['mae']:.4f} | "
-        f"MAPE: {metrics['mape']:.2f}%"
+        f"MAPE: {metrics['mape']:.2f}% |"
+        f"WAPE: {metrics['wape']:.2f}"
     )
 
     return model, fold_result
@@ -294,6 +296,7 @@ def run_training(horizon: int) -> dict:
         mlflow.log_metric("cv_mae_mean",   summary.mae_mean)
         mlflow.log_metric("cv_mape_mean",  summary.mape_mean)
         mlflow.log_metric("cv_rmsle_mean", summary.rmsle_mean)
+        mlflow.log_metric("cv_wape_mean", summary.wape_mean)
 
         # Gráfica de folds
         plot_path = (
