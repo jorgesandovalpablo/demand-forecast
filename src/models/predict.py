@@ -20,6 +20,7 @@ class ModelRegistry:
     — crítico para performance en la API.
     """
     _models: dict = {}
+    _features: dict = {}
 
     @classmethod
     def load(cls, horizon: int) -> object:
@@ -31,6 +32,10 @@ class ModelRegistry:
             model_path = Path(
                 f"models/lgbm_h{horizon}.pkl"
             )
+            features_path = Path(
+                f"models/features_h{horizon}.pkl"
+            )
+
             if not model_path.exists():
                 logger.error(
                     f"Modelo no encontrado: {model_path}"
@@ -41,16 +46,31 @@ class ModelRegistry:
                     f"Ejecuta primero train.py"
                 )
 
+            if not features_path.exists():
+                raise FileNotFoundError(
+                    f"Features no encontradas: {features_path}\n"
+                    f"Reentrena el modelo con train.py"
+                )
+
             logger.info(
                 f"Cargando modelo horizon={horizon} "
                 f"desde {model_path}..."
             )
             cls._models[horizon] = joblib.load(model_path)
+            cls._features[horizon] = joblib.load(features_path)
             logger.info(
-                f"Modelo horizon={horizon} cargado"
+                f"Modelo horizon={horizon} cargado |"
+                f"Features: {len(cls._features[horizon])}"
             )
 
         return cls._models[horizon]
+
+    @classmethod
+    def get_features(cls, horizon: int) -> list:
+        """Retorna las features del modelo cargado."""
+        if horizon not in cls._features:
+            cls.load(horizon)
+        return cls._features[horizon]
 
     @classmethod
     def clear_cache(cls) -> None:
@@ -100,6 +120,12 @@ def prepare_prediction_data(
         future_rows.append(temp)
 
     future_df = pd.concat(future_rows, ignore_index=True)
+    if 'transferred' in future_df.columns:
+        future_df['transferred'] = (
+            future_df['transferred']
+            .fillna(False)
+            .astype(bool)
+        )
 
     # Copiar columnas estáticas de tienda
     store_cols = ['store_nbr', 'city', 'state',
@@ -190,9 +216,18 @@ def predict(
         horizon=horizon
     )
 
-    # Obtener columnas de features
-    feature_cols = get_feature_cols(prediction_df)
-    X_pred       = prediction_df[feature_cols]
+    # Usa exactamente las features del entrenamiento
+    feature_cols = ModelRegistry.get_features(horizon)
+
+    # Verificar que todas las features existen
+    missing = set(feature_cols) - set(prediction_df.columns)
+    if missing:
+        logger.error(f"Features faltantes: {missing}")
+        raise ValueError(
+            f"Faltan features en predicción: {missing}"
+        )
+
+    X_pred = prediction_df[feature_cols]
 
     # Predicción en escala log
     y_pred_log  = model.predict(X_pred)
