@@ -417,7 +417,11 @@ def _encode_categoricals(df: pd.DataFrame) -> pd.DataFrame:
         if col in df.columns:
             if df[col].dtype.name != 'category':
                 df[col] = df[col].astype('category')
-            df[col] = df[col].cat.codes.astype('int16')
+            df[col] = df[col].cat.codes.astype('int16')    
+        # Garantizar tipos correctos para LightGBM
+        # antes de pasar al modelo
+        if 'transferred' in df.columns:
+            df['transferred'] = df['transferred'].astype(bool)
 
     logger.info("  Encoding completado")
     return df

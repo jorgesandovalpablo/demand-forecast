@@ -224,7 +224,11 @@ def _handle_nulls(df: pd.DataFrame) -> pd.DataFrame:
 
     # Transferred: imputar con False
     if 'transferred' in df.columns:
-        df['transferred'] = df['transferred'].fillna(False)
+        df['transferred'] = (
+            df['transferred']
+            .fillna(False)
+            .astype(bool)      # ← garantiza tipo bool siempre
+        )
 
     logger.info("Tratamiento de nulos completado")
     return df
