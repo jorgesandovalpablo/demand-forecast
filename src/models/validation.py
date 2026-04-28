@@ -307,4 +307,4 @@ def plot_folds(
             logger.info("Continuando con el entrenamiento del modelo final...")
 
 
-    plt.show()
+    plt.close()
