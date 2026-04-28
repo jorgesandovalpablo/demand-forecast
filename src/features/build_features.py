@@ -44,6 +44,18 @@ NUMERICAL_FEATURES = [
     'ranking_tienda',
 ]
 
+def _select_windows(horizon:int) -> list :
+    """
+    Funcion para devolver la lista de lags
+    de acuerdo al horizonte del modelo
+    """
+    lags = {
+        7:  [7, 14, 21, 28, 364],
+        30: [30, 60, 90, 364]
+    }[horizon]
+
+    return lags 
+
 
 # -------------------------------
 # 1. Features temporales
@@ -185,10 +197,7 @@ def _build_lag_features(df: pd.DataFrame,
     group = ['store_nbr', 'family']
     target = config['data']['target']
 
-    lags = {
-        7:  [7, 14, 21, 28, 364],
-        30: [30, 60, 90, 364]
-    }[horizon]
+    lags = _select_windows(horizon)
 
     for lag in lags:
         col_name = f'lag_{lag}'
@@ -218,10 +227,7 @@ def _build_rolling_features(df: pd.DataFrame,
     group  = ['store_nbr', 'family']
     target = config['data']['target']
 
-    windows = {
-        7:  [7, 14, 28],
-        30: [30, 60, 90]
-    }[horizon]
+    windows = _select_windows(horizon)
 
     df = df.sort_values(['store_nbr', 'family', 'date'])
 
@@ -370,25 +376,34 @@ def _build_store_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     logger.info("  Construyendo features de tienda...")
 
-    store_stats = (
-        df.groupby(['store_nbr', 'family'],observed=True)
-        [config['data']['target']]
-        .agg(['mean', 'std'])
-        .rename(columns={
-            'mean': 'venta_media_historica',
-            'std':  'venta_std_historica'
-        })
-        .reset_index()
-    )
-
-    df = df.merge(
-        store_stats,
-        on=['store_nbr', 'family'],
-        how='left'
-    )
+    # Si ya fueron inyectadas desde el modelo guardado
+    # no recalcular — usar las del historial completo
+    if 'venta_media_historica' not in df.columns:
+        store_stats = (
+            df.groupby(
+                ['store_nbr', 'family'],
+                observed=True
+            )[config['data']['target']]
+            .agg(['mean', 'std'])
+            .rename(columns={
+                'mean': 'venta_media_historica',
+                'std':  'venta_std_historica'
+            })
+            .reset_index()
+        )
+        df = df.merge(
+            store_stats,
+            on=['store_nbr', 'family'],
+            how='left'
+        )
+    else:
+        logger.info(
+            "  Store stats ya disponibles — "
+            "usando historial completo"
+        )
 
     ranking = (
-        df.groupby('store_nbr',observed=True)
+        df.groupby('store_nbr', observed=True)
         [config['data']['target']]
         .sum()
         .rank(ascending=False)
