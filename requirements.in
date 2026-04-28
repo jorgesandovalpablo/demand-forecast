@@ -18,4 +18,5 @@ isort
 pre-commit
 python-dotenv
 pyarrow
+shap
 setuptools>=68

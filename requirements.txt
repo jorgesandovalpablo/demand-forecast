@@ -105,7 +105,9 @@ click-plugins==1.1.1.2
 click-repl==0.3.0
     # via celery
 cloudpickle==3.1.2
-    # via mlflow-skinny
+    # via
+    #   mlflow-skinny
+    #   shap
 colorama==0.4.6
     # via dvc
 colorlog==6.10.1
@@ -288,6 +290,10 @@ kombu==5.6.2
     #   dvc-task
 lightgbm==4.6.0
     # via -r requirements.in
+llvmlite==0.47.0
+    # via
+    #   numba
+    #   shap
 lxml==6.0.2
     # via dagshub-annotation-converter
 mako==1.3.10
@@ -326,6 +332,8 @@ networkx==3.6.1
     # via dvc
 nodeenv==1.10.0
     # via pre-commit
+numba==0.65.1
+    # via shap
 numpy==2.4.3
     # via
     #   -r requirements.in
@@ -333,10 +341,12 @@ numpy==2.4.3
     #   lightgbm
     #   matplotlib
     #   mlflow
+    #   numba
     #   optuna
     #   pandas
     #   scikit-learn
     #   scipy
+    #   shap
     #   skops
 omegaconf==2.3.0
     # via
@@ -377,6 +387,7 @@ packaging==26.0
     #   mlflow-tracing
     #   optuna
     #   pytest
+    #   shap
     #   skops
 pandas==2.3.3
     # via
@@ -384,6 +395,7 @@ pandas==2.3.3
     #   dagshub
     #   dagshub-annotation-converter
     #   mlflow
+    #   shap
 pathspec==1.0.4
     # via
     #   black
@@ -528,12 +540,14 @@ scikit-learn==1.8.0
     # via
     #   -r requirements.in
     #   mlflow
+    #   shap
     #   skops
 scipy==1.17.1
     # via
     #   lightgbm
     #   mlflow
     #   scikit-learn
+    #   shap
     #   skops
 scmrepo==3.6.1
     # via
@@ -543,6 +557,8 @@ semver==3.0.4
     # via
     #   dagshub
     #   gto
+shap==0.51.0
+    # via -r requirements.in
 shellingham==1.5.4
     # via typer
 shortuuid==1.0.13
@@ -558,6 +574,8 @@ six==1.17.0
     #   treelib
 skops==0.13.0
     # via mlflow
+slicer==0.0.8
+    # via shap
 smmap==5.0.3
     # via gitdb
 sqlalchemy==2.0.48
@@ -588,6 +606,7 @@ tqdm==4.67.3
     #   fsspec
     #   optuna
     #   scmrepo
+    #   shap
 treelib==1.8.0
     # via dagshub
 typer==0.24.1
@@ -605,6 +624,7 @@ typing-extensions==4.15.0
     #   opentelemetry-semantic-conventions
     #   pydantic
     #   pydantic-core
+    #   shap
     #   sqlalchemy
     #   typing-inspect
     #   typing-inspection
