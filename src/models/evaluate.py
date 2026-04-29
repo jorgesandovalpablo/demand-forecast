@@ -5,7 +5,7 @@ import lightgbm as lgb
 import mlflow
 import joblib
 import matplotlib.pyplot as plt
-import shap
+#import shap
 from pathlib import Path
 from src.utils.logger import get_logger
 from src.utils.config import config
