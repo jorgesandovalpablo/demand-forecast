@@ -44,7 +44,7 @@ NUMERICAL_FEATURES = [
     'ranking_tienda',
 ]
 
-def _select_windows(horizon:int) -> list :
+def _select_windows_lag(horizon:int) -> list :
     """
     Funcion para devolver la lista de lags
     de acuerdo al horizonte del modelo
@@ -52,6 +52,18 @@ def _select_windows(horizon:int) -> list :
     lags = {
         7:  [7, 14, 21, 28, 364],
         30: [30, 60, 90, 364]
+    }[horizon]
+
+    return lags 
+
+def _select_windows_rolling(horizon:int) -> list :
+    """
+    Funcion para devolver la lista de rolling
+    de acuerdo al horizonte del modelo
+    """
+    lags = {
+        7:  [7, 14, 28],
+        30: [30, 60, 90]
     }[horizon]
 
     return lags 
@@ -197,7 +209,7 @@ def _build_lag_features(df: pd.DataFrame,
     group = ['store_nbr', 'family']
     target = config['data']['target']
 
-    lags = _select_windows(horizon)
+    lags = _select_windows_lag(horizon)
 
     for lag in lags:
         col_name = f'lag_{lag}'
@@ -227,13 +239,13 @@ def _build_rolling_features(df: pd.DataFrame,
     group  = ['store_nbr', 'family']
     target = config['data']['target']
 
-    windows = _select_windows(horizon)
+    windows = _select_windows_rolling(horizon)
 
     df = df.sort_values(['store_nbr', 'family', 'date'])
 
     for w in windows:
         shifted = (
-            df.groupby(group)[target]
+            df.groupby(group,observed=True)[target]
             .shift(horizon)
         )
 
@@ -282,33 +294,37 @@ def _build_rolling_features(df: pd.DataFrame,
 # -------------------------------
 # 5. Features de Oil
 # -------------------------------
-def _build_oil_features(df: pd.DataFrame) -> pd.DataFrame:
+def _build_oil_features(df: pd.DataFrame, horizon) -> pd.DataFrame:
     """
     Construye features del precio del petróleo.
     """
     logger.info("  Construyendo features de oil...")
 
+    lags = _select_windows_lag(horizon)
+    rolls = _select_windows_rolling(horizon)
+
     df = df.sort_values('date')
 
-    for lag in [7, 14, 30]:
+    for lag in lags:
         df[f'oil_lag_{lag}'] = (
             df.groupby('store_nbr',observed=True)['dcoilwtico']
             .shift(lag)
             .astype('float32')
         )
 
-    for w in [7, 30]:
+    for w in rolls:
+        
         df[f'oil_rolling_mean_{w}'] = (
             df.groupby('store_nbr',observed=True)['dcoilwtico']
             .transform(
-                lambda x: x.shift(7).rolling(w, min_periods=1).mean()
+                lambda x: x.shift(horizon).rolling(w, min_periods=1).mean()
             ).astype('float32')
         )
 
     # Cambio porcentual semanal del precio
-    df['oil_pct_change_7'] = (
+    df[f'oil_pct_change_{horizon}'] = (
         df.groupby('store_nbr',observed=True)['dcoilwtico']
-        .pct_change(periods=7)
+        .pct_change(periods=horizon)
         .astype('float32')
     )
 
@@ -319,7 +335,7 @@ def _build_oil_features(df: pd.DataFrame) -> pd.DataFrame:
 # -------------------------------
 # 6. Features de promoción
 # -------------------------------
-def _build_promo_features(df: pd.DataFrame) -> pd.DataFrame:
+def _build_promo_features(df: pd.DataFrame, horizon:int) -> pd.DataFrame:
     group = ['store_nbr', 'family']
     df = df.sort_values(['store_nbr', 'family', 'date'])
 
@@ -327,16 +343,17 @@ def _build_promo_features(df: pd.DataFrame) -> pd.DataFrame:
         df['onpromotion'] > 0
     ).astype('int8')
 
-    df['promo_lag_7'] = (
+
+    df[f'promo_lag_{horizon}'] = (
         df.groupby(group, observed=True)['onpromotion']
-        .shift(7)
+        .shift(horizon)
         .astype('float32')
     )
 
-    df['rolling_promo_mean_14'] = (
+    df[f'rolling_promo_mean_{horizon*2}'] = (
         df.groupby(group, observed=True)['onpromotion']  # ← fix
         .transform(
-            lambda x: x.shift(7).rolling(14, min_periods=1).mean()
+            lambda x: x.shift(horizon).rolling(horizon*2, min_periods=1).mean()
         ).astype('float32')
     )
 
@@ -347,19 +364,19 @@ def _build_promo_features(df: pd.DataFrame) -> pd.DataFrame:
 # -------------------------------
 # 7. Features de transacciones
 # -------------------------------
-def _build_transaction_features(df: pd.DataFrame) -> pd.DataFrame:
+def _build_transaction_features(df: pd.DataFrame, horizon:int) -> pd.DataFrame:
     df = df.sort_values(['store_nbr', 'date'])
 
-    df['trans_lag_7'] = (
+    df[f'trans_lag_{horizon}'] = (
         df.groupby('store_nbr',observed=True)['transactions']
-        .shift(7)
+        .shift(horizon)
         .astype('float32')
     )
 
-    df['trans_rolling_mean_7'] = (
+    df[f'trans_rolling_mean_{horizon}'] = (
         df.groupby('store_nbr', observed=True)['transactions']  # ← fix
         .transform(
-            lambda x: x.shift(7).rolling(7, min_periods=1).mean()
+            lambda x: x.shift(horizon).rolling(horizon, min_periods=1).mean()
         ).astype('float32')
     )
 
@@ -370,7 +387,7 @@ def _build_transaction_features(df: pd.DataFrame) -> pd.DataFrame:
 # -------------------------------
 # 8. Features de tienda
 # -------------------------------
-def _build_store_features(df: pd.DataFrame) -> pd.DataFrame:
+def _build_store_features(df: pd.DataFrame, horizon: int) -> pd.DataFrame:
     """
     Construye features históricas de tienda.
     """
@@ -467,16 +484,21 @@ def build_features(df: pd.DataFrame,
         f"(horizon={horizon} días)"
     )
     logger.info("=" * 50)
+    df = df.copy()
 
     df = _build_temporal_features(df)
     df = _build_holiday_features(df)
     df = _build_lag_features(df, horizon)
     df = _build_rolling_features(df, horizon)
-    df = _build_oil_features(df)
-    df = _build_promo_features(df)
-    df = _build_transaction_features(df)
-    df = _build_store_features(df)
+    df = _build_oil_features(df, horizon)
+    df = _build_promo_features(df, horizon)
+    df = _build_transaction_features(df, horizon)
+    df = _build_store_features(df, horizon)
     df = _encode_categoricals(df)
+
+    print("="*75)
+    print(f"Features finales:{df.columns.to_list()}")
+    print("="*75)
 
     # Eliminar filas con nulos en lags
     # (primeras semanas sin historial suficiente)
