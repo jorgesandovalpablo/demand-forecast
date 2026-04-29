@@ -118,17 +118,6 @@ def _build_holiday_features(df: pd.DataFrame) -> pd.DataFrame:
         df['holiday_type'] != 'No_Holiday'
     ).astype('int8')
 
-    df['es_festivo_local'] = (
-        df['holiday_type'].isin(['Local'])
-    ).astype('int8')
-
-    df['es_festivo_regional'] = (
-        df['holiday_type'].isin(['Regional'])
-    ).astype('int8')
-
-    df['es_traslado'] = (
-        df['transferred'].astype(bool)
-    ).astype('int8')
 
     # Holiday impact type desde config
     impact = config['features']['holiday_impact']
@@ -178,14 +167,6 @@ def _build_holiday_features(df: pd.DataFrame) -> pd.DataFrame:
     df['dias_desde_ultimo_festivo'] = (
         df['date'].map(dias_desde).astype('int16')
     )
-
-    # Ventanas pre y post festivo
-    df['es_pre_festivo'] = (
-        df['dias_para_siguiente_festivo'] <= 2
-    ).astype('int8')
-    df['es_post_festivo'] = (
-        df['dias_desde_ultimo_festivo'] <= 2
-    ).astype('int8')
 
     logger.info(" Features de festivos completadas")
     return df
@@ -321,12 +302,6 @@ def _build_oil_features(df: pd.DataFrame, horizon) -> pd.DataFrame:
             ).astype('float32')
         )
 
-    # Cambio porcentual semanal del precio
-    df[f'oil_pct_change_{horizon}'] = (
-        df.groupby('store_nbr',observed=True)['dcoilwtico']
-        .pct_change(periods=horizon)
-        .astype('float32')
-    )
 
     logger.info("   Features de oil completadas")
     return df
