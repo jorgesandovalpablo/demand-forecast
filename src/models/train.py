@@ -29,7 +29,7 @@ def get_feature_cols(df: pd.DataFrame) -> list:
     """
     exclude = [
         'date', 'sales', 'sales_raw',
-        'id', 'holiday_description'
+        'id', 'holiday_description','transactions'
     ]
     return [c for c in df.columns if c not in exclude]
 
@@ -84,14 +84,18 @@ def _train_fold(
     X_val   = df.loc[val_idx, feature_cols]
     y_val   = df.loc[val_idx, target]
 
+    top_families = [3, 7, 12, 30] # Define tus 5 familias
+    w_train = np.ones(len(y_train))
+    w_train[df.loc[train_idx, 'family'].isin(top_families)] = 1.5
+
     # Dataset de LightGBM
-    train_data = lgb.Dataset(X_train, label=y_train)
+    train_data = lgb.Dataset(X_train, label=y_train, weight=w_train)
     val_data   = lgb.Dataset(X_val,   label=y_val,
                              reference=train_data)
 
     # Callbacks
     callbacks = [
-        lgb.early_stopping(stopping_rounds=50,
+        lgb.early_stopping(stopping_rounds=100,
                            verbose=False),
         lgb.log_evaluation(period=100)
     ]
@@ -165,7 +169,11 @@ def _train_final_model(
     X = train_df[feature_cols]
     y = train_df[target]
 
-    train_data = lgb.Dataset(X, label=y)
+    top_families = [3, 7, 12, 30]
+    final_weights = np.ones(len(y))
+    final_weights[train_df['family'].isin(top_families)] = 2
+
+    train_data = lgb.Dataset(X, label=y, weight=final_weights)  
 
     # Sin early stopping en el modelo final
     # usamos el n_estimators óptimo de la CV
@@ -190,6 +198,8 @@ def _train_final_model(
 def _save_model(
     model: lgb.Booster,
     horizon: int,
+    feature_cols: list,
+    df: pd.DataFrame,
     metrics: dict
 ) -> Path:
     """
@@ -199,14 +209,39 @@ def _save_model(
     models_path = Path("models")
     models_path.mkdir(exist_ok=True)
 
-    model_name = f"lgbm_h{horizon}.pkl"
-    model_path = models_path / model_name
-
+    # Guarda el modelo
+    model_path = models_path / f"lgbm_h{horizon}.pkl"
     joblib.dump(model, model_path)
-    logger.info(f"Modelo guardado: {model_path}")
+
+    # Guarda las features — clave para predict
+    features_path = models_path / f"features_h{horizon}.pkl"
+    joblib.dump(feature_cols, features_path)
+
+    
+    # Guarda store stats — features estáticas
+    # calculadas sobre el historial completo
+    target      = config['data']['target']
+    store_stats = (
+        df.groupby(
+            ['store_nbr', 'family'],
+            observed=True
+        )[target]
+        .agg(['mean', 'std'])
+        .rename(columns={
+            'mean': 'venta_media_historica',
+            'std':  'venta_std_historica'
+        })
+        .reset_index()
+    )
+    stats_path = models_path / f"store_stats_h{horizon}.pkl"
+    joblib.dump(store_stats, stats_path)
+
+    logger.info(f"Modelo guardado:   {model_path}")
+    logger.info(f"Features guardadas: {features_path}")
+    logger.info(f"  Total features: {len(feature_cols)}")
+    logger.info(f"Store stats guardadas:{stats_path}")
 
     return model_path
-
 
 # ─────────────────────────────────────────
 # Función principal — punto de entrada
@@ -324,7 +359,8 @@ def run_training(horizon: int) -> dict:
 
         # Guardar y loggear modelo
         model_path = _save_model(
-            final_model, horizon,
+            final_model, horizon, feature_cols,
+            df,
             vars(summary)
         )
         mlflow.lightgbm.log_model(
