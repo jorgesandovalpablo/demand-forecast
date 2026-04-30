@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from pathlib import Path
 from src.utils.logger import get_logger
 from src.utils.config import config
@@ -23,10 +24,8 @@ NUMERICAL_FEATURES = [
     'es_quincena', 'es_inicio_mes',
     # Festivos
     'es_festivo', 'es_festivo_local',
-    'es_festivo_regional', 'es_traslado',
     'dias_para_siguiente_festivo',
     'dias_desde_ultimo_festivo',
-    'es_pre_festivo', 'es_post_festivo',
     # Promoción
     'onpromotion', 'tiene_promo',
     'promo_lag_7', 'rolling_promo_mean_14',
@@ -34,9 +33,8 @@ NUMERICAL_FEATURES = [
     'dcoilwtico', 'oil_lag_7',
     'oil_lag_14', 'oil_lag_30',
     'oil_rolling_mean_7', 'oil_rolling_mean_30',
-    'oil_pct_change_7',
     # Transacciones
-    'transactions', 'trans_lag_7',
+    'trans_lag_7',
     'trans_rolling_mean_7',
     # Tienda
     'venta_media_historica',
@@ -98,6 +96,11 @@ def _build_temporal_features(df: pd.DataFrame) -> pd.DataFrame:
     df['es_inicio_mes'] = (
         df['date'].dt.day <= 3
     ).astype('int8')
+    df['day_sin'] = np.sin(2 * np.pi * df['dia_semana'] / 7)
+    df['day_cos'] = np.cos(2 * np.pi * df['dia_semana'] / 7)
+    
+    df['pico_quincena_findex'] = (df['es_fin_de_semana'] & df['es_quincena']).astype('int8')
+    df['es_viernes'] = (df['dia_semana'] == 4).astype('int8')
 
     logger.info(" Features temporales completadas")
     return df
