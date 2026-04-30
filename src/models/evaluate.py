@@ -10,6 +10,7 @@ from pathlib import Path
 from src.utils.logger import get_logger
 from src.utils.config import config
 from src.models.validation import compute_metrics
+from src.models.train import setup_mlflow
 
 logger = get_logger(__name__)
 
@@ -95,6 +96,10 @@ def evaluate_by_family(
     target   = config['data']['target']
     test_df  = test_df.copy()
     test_df['y_pred'] = y_pred
+
+    test_df['abs_error'] = np.abs(test_df[target] - y_pred)
+    family_wape = test_df.groupby('family').apply(lambda x: x['abs_error'].sum() / x[target].sum()).copy()
+    print(family_wape.loc[[3, 7, 12, 30]])
 
     results = []
     for family, group in test_df.groupby('family'):
@@ -246,7 +251,7 @@ def plot_predictions(
     test_df: pd.DataFrame,
     y_pred: np.ndarray,
     store_nbr: int = 1,
-    family: str = 'GROCERY I',
+    family: int = 12,
     save_path: str = None
 ) -> None:
     """
@@ -261,7 +266,7 @@ def plot_predictions(
     subset  = test_df[mask].copy()
     subset['y_pred'] = y_pred[mask.values]
 
-    fig, axes = plt.subplots(2, 1, figsize=(14, 8))
+    fig, axes = plt.subplots(2, 1, figsize=(14, 8))    
 
     # Predicciones vs reales en escala log
     axes[0].plot(
@@ -300,7 +305,7 @@ def plot_predictions(
     if save_path:
         plt.savefig(save_path, dpi=150)
         logger.info(f"Gráfica guardada: {save_path}")
-    plt.show()
+    plt.show(block=False)
 
 
 def plot_feature_importance(
@@ -329,7 +334,7 @@ def plot_feature_importance(
     if save_path:
         plt.savefig(save_path, dpi=150)
         logger.info(f"Gráfica guardada: {save_path}")
-    plt.show()
+    plt.show(block=False)
 
 
 def plot_errors_by_family(
@@ -367,7 +372,7 @@ def plot_errors_by_family(
     if save_path:
         plt.savefig(save_path, dpi=150)
         logger.info(f"Gráfica guardada: {save_path}")
-    plt.show()
+    plt.show(block=False)
 
 
 # ─────────────────────────────────────────
@@ -385,6 +390,8 @@ def run_evaluation(horizon: int) -> dict:
     Retorna:
         dict con todas las métricas y análisis
     """
+    #setup_mlflow()
+    
     logger.info("=" * 50)
     logger.info(
         f"Iniciando evaluación "
@@ -460,11 +467,11 @@ def run_evaluation(horizon: int) -> dict:
             )
         )
 
-        # Predicciones vs real (tienda 1, GROCERY I)
+        # Predicciones vs real (tienda 15 GROCERY I)
         plot_predictions(
             test_df, y_pred,
-            store_nbr=1,
-            family='GROCERY I',
+            store_nbr=44,
+            family=3,
             save_path=str(
                 figures_path /
                 f"predictions_h{horizon}.png"
