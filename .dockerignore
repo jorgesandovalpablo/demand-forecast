@@ -1,0 +1,15 @@
+# .dockerignore
+venv/
+.git/
+.github/
+notebooks/
+data/raw/
+data/processed/
+__pycache__/
+*.pyc
+*.pyo
+.env
+.pytest_cache/
+logs/
+*.log
+README.md
