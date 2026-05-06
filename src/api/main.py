@@ -77,7 +77,7 @@ async def lifespan(app: FastAPI):
                 f"Modelo horizon={horizon} no encontrado"
             )
 
-    logger.info("✅ API lista")
+    logger.info(" API lista")
     yield
 
     # Shutdown
@@ -163,7 +163,7 @@ async def get_metrics(horizon: int):
 
     metrics_df = pd.read_parquet(metrics_path)
     avg_metrics = metrics_df[
-        ['rmse', 'mae', 'mape', 'rmsle']
+        ['rmse', 'mae', 'mape', 'rmsle', 'wape']
     ].mean()
 
     return MetricsResponse(
@@ -171,7 +171,8 @@ async def get_metrics(horizon: int):
         rmse=round(float(avg_metrics['rmse']), 4),
         mae=round(float(avg_metrics['mae']),   4),
         mape=round(float(avg_metrics['mape']), 4),
-        rmsle=round(float(avg_metrics['rmsle']), 4)
+        rmsle=round(float(avg_metrics['rmsle']), 4),
+        wape=round(float(avg_metrics['wape']), 4),
     )
 
 
