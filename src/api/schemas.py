@@ -20,8 +20,10 @@ class PredictionRequest(BaseModel):
         ...,
         description="Horizonte de predicción: 7 (diario) o 30 (mensual)"
     )
-    family: Optional[str] = Field(
+    family: Optional[int] = Field(
         default=None,
+        ge=0,
+        le=33,
         description="Familia de producto. Si es None retorna todas."
     )
 
@@ -38,7 +40,7 @@ class PredictionRequest(BaseModel):
             "example": {
                 "store_nbr": 1,
                 "horizon":   7,
-                "family":    "GROCERY I"
+                "family":  11
             }
         }
 
@@ -75,7 +77,7 @@ class PredictionItem(BaseModel):
     """
     date:            date
     store_nbr:       int
-    family:          str
+    family:          int
     predicted_sales: float
     lower_bound:     float
     upper_bound:     float
@@ -100,7 +102,7 @@ class PredictionResponse(BaseModel):
                     {
                         "date":            "2024-01-16",
                         "store_nbr":       1,
-                        "family":          "GROCERY I",
+                        "family":          3,
                         "predicted_sales": 245.30,
                         "lower_bound":     198.20,
                         "upper_bound":     292.40
