@@ -300,7 +300,8 @@ def _reduce_memory(df: pd.DataFrame) -> pd.DataFrame:
 # -----------------
 
 def run_preprocessing(data: dict,
-                      save: bool = True) -> tuple:
+                      save: bool = True, 
+                      predict: bool = False) -> tuple:
     """
     Ejecuta el pipeline completo de preprocessing.
 
@@ -315,31 +316,35 @@ def run_preprocessing(data: dict,
     logger.info("Iniciando preprocessing pipeline")
     logger.info("=" * 50)
 
-    logger.info("Procesando TRAIN...")
-    train = _merge_datasets(
-        df=data['train'],
-        stores=data['stores'],
-        oil=data['oil'],
-        transactions=data['transactions'],
-        holidays=data['holidays']
-    )
-    train = _handle_nulls(train)
-    train = _transform_target(train)
-    train = _reduce_memory(train)
 
-    logger.info("Procesando TEST...")
-    test = _merge_datasets(
+    if predict:
+        logger.info("Procesando TEST...")
+        test = _merge_datasets(
         df=data['test'],
         stores=data['stores'],
         oil=data['oil'],
         transactions=data['transactions'],
         holidays=data['holidays']
-    )
-    test = _handle_nulls(test)
-    test = _reduce_memory(test)
+        )
+        train =  pd.DataFrame()
+        test = _handle_nulls(test)
+
+    else:
+        logger.info("Procesando TRAIN...")
+        train = _merge_datasets(
+            df=data['train'],
+            stores=data['stores'],
+            oil=data['oil'],
+            transactions=data['transactions'],
+            holidays=data['holidays']
+        )
+        train = _handle_nulls(train)
+        train = _transform_target(train)
+        train = _reduce_memory(train)
+        test = pd.DataFrame()
 
     if save:
-        _save_processed(train, test)
+        _save_processed(train,test)
 
     logger.info("=" * 50)
     logger.info(" Preprocessing completado")
