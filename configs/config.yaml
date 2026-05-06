@@ -38,25 +38,27 @@ model:
     n_estimators: 1500
     learning_rate: 0.05
     objective: "regression_l1"
+    metric: "mae"
     num_leaves: 63
     max_bin: 255
     min_data_in_leaf: 20
     lambda_l1: 0.1
     lambda_l2: 0.2
     random_state: 42
-    n_jobs: 6
+    n_jobs: -1
     verbosity: -1
   params_lgbm_mensual:
     n_estimators: 1000
     learning_rate: 0.01
     objective: "huber"
+    metric: "mae"
     num_leaves: 31
     max_bin: 255
     min_data_in_leaf: 100
     lambda_l1: 0.5
     lambda_l1: 0.1
     random_state: 42
-    n_jobs: 6
+    n_jobs: -1
     verbosity: -1
 
 features:
@@ -79,10 +81,15 @@ features:
       - "Recupero"
     atypical:
       - "Terremoto"
+    
+lags:
+  max_lag: 365
+  max_rolling: 90
 
 training:
   test_size_weeks: 8
   n_folds: 5
+  weight_value: 5
 
 mlflow:
   experiment_name: "demand-forecast"

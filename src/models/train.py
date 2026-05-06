@@ -86,7 +86,7 @@ def _train_fold(
 
     top_families = [3, 7, 12, 30] # Define tus 5 familias
     w_train = np.ones(len(y_train))
-    w_train[df.loc[train_idx, 'family'].isin(top_families)] = 1.5
+    w_train[df.loc[train_idx, 'family'].isin(top_families)] = 5
 
     # Dataset de LightGBM
     train_data = lgb.Dataset(X_train, label=y_train, weight=w_train)
@@ -95,7 +95,7 @@ def _train_fold(
 
     # Callbacks
     callbacks = [
-        lgb.early_stopping(stopping_rounds=100,
+        lgb.early_stopping(stopping_rounds=150,
                            verbose=False),
         lgb.log_evaluation(period=100)
     ]
@@ -171,7 +171,7 @@ def _train_final_model(
 
     top_families = [3, 7, 12, 30]
     final_weights = np.ones(len(y))
-    final_weights[train_df['family'].isin(top_families)] = 2
+    final_weights[train_df['family'].isin(top_families)] = config['training']['weight_value']
 
     train_data = lgb.Dataset(X, label=y, weight=final_weights)  
 
