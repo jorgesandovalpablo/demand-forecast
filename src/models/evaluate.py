@@ -164,7 +164,7 @@ def evaluate_by_store(
     logger.info("\nTop 5 tiendas con mayor RMSE:")
     logger.info(
         store_metrics[
-            ['store_nbr', 'city', 'rmse', 'mape']
+            ['store_nbr', 'city', 'rmse', 'mape','wape']
         ]
         .head()
         .to_string(index=False)
@@ -202,6 +202,23 @@ def evaluate_by_time(
             'mean': 'mae_diario',
             'std':  'std_diario'
         })
+    )
+
+    print(time_metrics.head())
+
+    top_time = (
+        time_metrics.
+        sort_values('mae_diario',ascending=False).
+        reset_index(drop=True)
+    )
+
+    logger.info("\nTop fechas con mayor MAE:")
+    logger.info(
+        top_time[
+            ['date', 'mae_diario','std_diario']
+        ]
+        .head(10)
+        .to_string(index=False)
     )
 
     return time_metrics
@@ -468,15 +485,16 @@ def run_evaluation(horizon: int) -> dict:
         )
 
         # Predicciones vs real (tienda 15 GROCERY I)
-        plot_predictions(
-            test_df, y_pred,
-            store_nbr=44,
-            family=3,
-            save_path=str(
-                figures_path /
-                f"predictions_h{horizon}.png"
+        for i in [54,40,38,30,39]:
+            plot_predictions(
+                test_df, y_pred,
+                store_nbr=i,
+                family=3,
+                save_path=str(
+                    figures_path /
+                    f"predictions_h{horizon}_store{i}.png"
+                )
             )
-        )
 
         # Loggear artefactos
         for fig_path in figures_path.glob(
