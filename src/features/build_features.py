@@ -227,51 +227,34 @@ def _build_rolling_features(df: pd.DataFrame,
 
     df = df.sort_values(['store_nbr', 'family', 'date'])
 
+    shifted_target = df.groupby(group, observed=True)[target].shift(horizon)
+
     for w in windows:
-        shifted = (
-            df.groupby(group,observed=True)[target]
-            .shift(horizon)
-        )
+        logger.info(f"    Procesando ventana: {w}d")
+        
+        # Agrupamos el objeto desplazado y aplicamos rolling directo
+        rolling_obj = (shifted_target.groupby([df['store_nbr'], df['family']], observed=True)
+                       .rolling(window=w, min_periods=1))
+        
+        df[f'rolling_mean_{w}d'] = (rolling_obj.mean()
+                                    .reset_index(level=[0,1], drop=True)
+                                    .astype('float32'))
+        df[f'rolling_std_{w}d']  = (rolling_obj.std()
+                                    .reset_index(level=[0,1], drop=True)
+                                    .astype('float32'))
+        df[f'rolling_max_{w}d']  = (rolling_obj.max()
+                                    .reset_index(level=[0,1], drop=True)
+                                    .astype('float32'))
 
-        df[f'rolling_mean_{w}d'] = (
-            shifted.groupby(
-                [df['store_nbr'], df['family']],
-                observed=True              # ← fix FutureWarning
-            ).transform(
-                lambda x: x.rolling(w, min_periods=1).mean()
-            ).astype('float32')
-        )
-
-        df[f'rolling_std_{w}d'] = (
-            shifted.groupby(
-                [df['store_nbr'], df['family']],
-                observed=True              # ← fix FutureWarning
-            ).transform(
-                lambda x: x.rolling(w, min_periods=1).std()
-            ).astype('float32')
-        )
-
-        df[f'rolling_max_{w}d'] = (
-            shifted.groupby(
-                [df['store_nbr'], df['family']],
-                observed=True              # ← fix FutureWarning
-            ).transform(
-                lambda x: x.rolling(w, min_periods=1).max()
-            ).astype('float32')
-        )
-
-    # Coeficiente de variación
-    # Usar la ventana más grande disponible
-    # según el horizonte para evitar KeyError
     std_col  = f'rolling_std_{windows[-1]}d'
     mean_col = f'rolling_mean_{windows[-1]}d'
 
-    df['cv_ventas'] = (
-        df[std_col] /
-        (df[mean_col] + 1)
-    ).astype('float32')
-
-    logger.info("  Rolling features completadas")
+    # Coeficiente de variación (limpiando ceros para evitar divisiones por cero)
+    df['cv_ventas'] = (df[std_col] / 
+                       (df[mean_col] + 1e-6)).astype('float32')
+    
+    logger.info("Rolling features completas")
+    
     return df
 
 
