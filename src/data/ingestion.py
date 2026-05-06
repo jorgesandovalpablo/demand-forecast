@@ -162,7 +162,7 @@ def _load_csv(name:str, data_path: Path) -> pd.DataFrame:
     _validate_schema(df, name, schema)
     return df
 
-def load_raw_data(data_path:str = None) -> dict:
+def load_raw_data(data_path:str = None, predict: bool = False) -> dict:
     """
     Carga los acrhivos csv deseados.
 
@@ -185,22 +185,33 @@ def load_raw_data(data_path:str = None) -> dict:
     path = Path(data_path or config['paths']['data_raw'])
     logger.info(f"IUniciando carga de datos desde: {path}")
 
-    data = {
-        'train':        _load_csv('train',            path),
-        'test':         _load_csv('test',             path),
+    if predict:
+        data = {        
         'stores':       _load_csv('stores',           path),
         'oil':          _load_csv('oil',              path),
         'holidays':     _load_csv('holidays_events',  path),
         'transactions': _load_csv('transactions',     path)
-    }
+        }
+    else:
+        data = {
+            'train':        _load_csv('train',            path),
+            'test':         _load_csv('test',             path),
+            'stores':       _load_csv('stores',           path),
+            'oil':          _load_csv('oil',              path),
+            'holidays':     _load_csv('holidays_events',  path),
+            'transactions': _load_csv('transactions',     path)
+        }
+
+        logger.info(f"  train:        {data['train'].shape}")
+        logger.info(f"  test:         {data['test'].shape}")
+
 
     logger.info("Archivos cargados correctamente")
-    logger.info(f"  train:        {data['train'].shape}")
-    logger.info(f"  test:         {data['test'].shape}")
     logger.info(f"  stores:       {data['stores'].shape}")
     logger.info(f"  oil:          {data['oil'].shape}")
     logger.info(f"  holidays:     {data['holidays'].shape}")
     logger.info(f"  transactions: {data['transactions'].shape}")
+
 
     return data
 
