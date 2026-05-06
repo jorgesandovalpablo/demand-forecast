@@ -4,8 +4,9 @@ import joblib
 from pathlib import Path
 from src.utils.logger import get_logger
 from src.utils.config import config
-from src.features.build_features import build_features
-from src.models.train import get_feature_cols
+from src.features.build_features import build_features, _encode_categoricals
+from src.data.ingestion import load_raw_data
+from src.data.preprocessing import run_preprocessing
 
 logger = get_logger(__name__)
 
@@ -21,6 +22,7 @@ class ModelRegistry:
     """
     _models: dict = {}
     _features: dict = {}
+    _store_stats: dict = {}
 
     @classmethod
     def load(cls, horizon: int) -> object:
@@ -35,6 +37,10 @@ class ModelRegistry:
             features_path = Path(
                 f"models/features_h{horizon}.pkl"
             )
+            stats_path = Path(
+                f"models/store_stats_h{horizon}.pkl"
+            )
+            
 
             if not model_path.exists():
                 logger.error(
@@ -49,7 +55,11 @@ class ModelRegistry:
             if not features_path.exists():
                 raise FileNotFoundError(
                     f"Features no encontradas: {features_path}\n"
-                    f"Reentrena el modelo con train.py"
+                )
+
+            if not stats_path.exists():
+                raise FileNotFoundError(
+                    f"Store stats no encontradas: {stats_path}\n"
                 )
 
             logger.info(
@@ -58,6 +68,7 @@ class ModelRegistry:
             )
             cls._models[horizon] = joblib.load(model_path)
             cls._features[horizon] = joblib.load(features_path)
+            cls._store_stats[horizon] = joblib.load(stats_path)
             logger.info(
                 f"Modelo horizon={horizon} cargado |"
                 f"Features: {len(cls._features[horizon])}"
@@ -73,9 +84,19 @@ class ModelRegistry:
         return cls._features[horizon]
 
     @classmethod
+    def get_store_stats(cls, horizon: int) -> list:
+        """Retorna las store stats del modelo cargado."""
+        if horizon not in cls._store_stats:
+            cls.load(horizon)
+        return cls._store_stats[horizon]
+
+
+    @classmethod
     def clear_cache(cls) -> None:
         """Limpia el caché — útil después de retraining."""
         cls._models = {}
+        cls._features = {}
+        cls._store_stats = {}
         logger.info("Caché de modelos limpiado")
 
 
@@ -85,7 +106,8 @@ class ModelRegistry:
 def prepare_prediction_data(
     historical_df: pd.DataFrame,
     future_dates: pd.DatetimeIndex,
-    horizon: int
+    horizon: int,
+    store_stats: pd.DataFrame
 ) -> pd.DataFrame:
     """
     Prepara el dataset para predecir fechas futuras.
@@ -106,65 +128,45 @@ def prepare_prediction_data(
         f"fechas: {future_dates[0]} -> {future_dates[-1]}"
     )
 
-    # Crear filas vacías para las fechas futuras
+    # 1 Crear filas vacías para las fechas futuras
     # por cada combinación tienda-familia
     stores_families = (
         historical_df[['store_nbr', 'family']]
         .drop_duplicates()
     )
 
-    future_rows = []
-    for date in future_dates:
-        temp = stores_families.copy()
-        temp['date'] = date
-        future_rows.append(temp)
-
-    future_df = pd.concat(future_rows, ignore_index=True)
-    if 'transferred' in future_df.columns:
-        future_df['transferred'] = (
-            future_df['transferred']
-            .fillna(False)
-            .astype(bool)
-        )
-
-    # Copiar columnas estáticas de tienda
-    store_cols = ['store_nbr', 'city', 'state',
-                  'type', 'cluster']
-    store_info = (
-        historical_df[store_cols]
-        .drop_duplicates('store_nbr')
-    )
-    future_df = future_df.merge(
-        store_info, on='store_nbr', how='left'
-    )
-
-    # El target es desconocido en el futuro
-    # lo inicializamos en 0
+    future_df = stores_families.assign(key=1).merge(
+        pd.DataFrame({'date': future_dates, 'key': 1}), on='key'
+    ).drop('key', axis=1)
+    # 2 El target es desconocido en el futuro
+    # se inicializa en 0
     future_df[config['data']['target']] = 0.0
 
-    # Concatenar historial + futuro para calcular lags
-    combined = pd.concat(
-        [historical_df, future_df],
-        ignore_index=True
-    ).sort_values(['store_nbr', 'family', 'date'])
+    data = load_raw_data(predict=True)
+    data['test'] = future_df
+    _, test = run_preprocessing(data, save=False, predict=True)
 
-    # Construir features sobre el combined
-    combined = build_features(
-        combined,
-        horizon=horizon,
-        save=False
-    )
+    # 4. CONCATENACIÓN CRÍTICA: Solo lo necesario para los lags (365 días)
+    combined = pd.concat([historical_df, test], ignore_index=True)
+    combined = combined.sort_values(['store_nbr', 'family', 'date'])
 
-    # Retornar solo las filas futuras
-    prediction_df = combined[
-        combined['date'].isin(future_dates)
-    ].copy()
+    # 5. Build Features (Asegúrate que devuelva float32)
+    combined = build_features(combined, horizon=horizon, save=False)
+
+    print("combined columns:", combined.columns.tolist())
+    print("store_stats columns:", store_stats.columns.tolist())
+
+    combined.to_parquet("data/predictions/predict_df.parquet")
+
+    # 6. Extraer solo futuro y liberar memoria
+    start_date = future_dates.min()
+    prediction_df = combined[combined['date'] >= start_date].copy()
 
     logger.info(
         f"Datos preparados: {prediction_df.shape}"
     )
-    return prediction_df
 
+    return prediction_df
 
 # ─────────────────────────────────────────
 # 3. Predicción principal
@@ -193,8 +195,17 @@ def predict(
     n_periods = n_periods or horizon
     model     = ModelRegistry.load(horizon)
 
+    max_history_needed = config['lags']['max_lag']
+
     # Generar fechas futuras
-    last_date    = historical_df['date'].max()
+    last_date = historical_df['date'].max()
+    cutoff_date = last_date - pd.Timedelta(days=max_history_needed)
+    
+    reduced_history = historical_df[historical_df['date'] >= cutoff_date].copy()
+    logger.info(f"Historial reducido para calculo de lags de:"
+                f" {len(historical_df)} a : {len(reduced_history)}")
+
+
     future_dates = pd.date_range(
         start=last_date + pd.Timedelta(days=1),
         periods=n_periods,
@@ -209,11 +220,14 @@ def predict(
         f"{future_dates[-1].date()}"
     )
 
+    store_stats = ModelRegistry.get_store_stats(horizon)
+
     # Preparar features
     prediction_df = prepare_prediction_data(
-        historical_df=historical_df,
+        historical_df=reduced_history,
         future_dates=future_dates,
-        horizon=horizon
+        horizon=horizon,
+        store_stats=store_stats
     )
 
     # Usa exactamente las features del entrenamiento
@@ -250,7 +264,11 @@ def predict(
             config['data']['target']: 'std_sales'
         })
     )
+    print('STD group:')
+    print(std_by_group.head())
+    print(f'Tipos:{std_by_group.info()}')
 
+    print('Results:')
     results = prediction_df[
         ['date', 'store_nbr', 'family']
     ].copy()
@@ -258,11 +276,17 @@ def predict(
         y_pred_real, 2
     )
 
-    results = results.merge(
-        std_by_group,
+    print(results.head())
+
+    std_by_group = _encode_categoricals(std_by_group)
+
+    results = pd.merge(
+        results, std_by_group, 
         on=['store_nbr', 'family'],
         how='left'
     )
+
+    print(results['std_sales'])
 
     results['lower_bound'] = np.clip(
         results['predicted_sales'] -
@@ -271,7 +295,7 @@ def predict(
     ).round(2)
     results['upper_bound'] = (
         results['predicted_sales'] +
-        1.96 * results['std_sales']
+        1.96 * results['std_sales'] * 1.5
     ).round(2)
 
     results = results.drop(columns=['std_sales'])
@@ -351,11 +375,18 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    # Cargar datos procesados
-    df = pd.read_parquet(
-        f"data/processed/"
-        f"train_features_d{args.horizon}.parquet"
-    )
+    data_path = Path("data/processed/train_processed.parquet")
+
+
+    if not data_path.exists():
+        raise FileNotFoundError(
+            "No se encontró train_processed.parquet\n"
+            "Ejecuta primero: python src/data/preprocessing.py"
+        )
+
+    logger.info(f"Cargando historial desde: {data_path}")
+    df = pd.read_parquet(data_path)
+    logger.info(f"Historial cargado: {df.shape}")
 
     # Generar predicciones
     predictions = predict(df, horizon=args.horizon)
