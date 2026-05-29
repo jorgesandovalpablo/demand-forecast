@@ -13,3 +13,6 @@ __pycache__/
 logs/
 *.log
 README.md
+new_project.sh
+test*.py
+notebook*.ipynb

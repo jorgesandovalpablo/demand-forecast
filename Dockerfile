@@ -2,7 +2,7 @@
 # Etapa 1 — Builder
 # Instala dependencias en una imagen temporal
 # ─────────────────────────────────────────
-FROM python:3.10.12-slim AS builder
+FROM python:3.12-slim AS builder
 
 # Evita que Python genere archivos .pyc
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -27,22 +27,26 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 # ─────────────────────────────────────────
 # Etapa 2 — Runtime
-# Imagen final ligera solo con lo necesario
+# Imagen final 
 # ─────────────────────────────────────────
-FROM python:3.10.12-slim AS runtime
+FROM python:3.12-slim  AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
+RUN apt-get update && apt-get install -y \
+    libgomp1 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Usuario no-root por seguridad
-# Nunca corras contenedores como root
 RUN useradd --create-home --shell /bin/bash appuser
 
 WORKDIR /app
 
 # Copiar librerías instaladas del builder
-COPY --from=builder /usr/local/lib/python3.10/site-packages \
-                    /usr/local/lib/python3.10/site-packages
+COPY --from=builder /usr/local/lib/python3.12/site-packages \
+                    /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin \
                     /usr/local/bin
 
@@ -52,10 +56,10 @@ COPY configs/   ./configs/
 COPY models/    ./models/
 COPY pyproject.toml .
 
-# Copiar variables de entorno de ejemplo
+# Copiar variables de entorno
 COPY .env.example .env
 
-# Crear carpetas necesarias
+# Crear carpetas 
 RUN mkdir -p data/processed \
              data/predictions \
              logs \
@@ -64,11 +68,11 @@ RUN mkdir -p data/processed \
 # Cambiar a usuario no-root
 USER appuser
 
-# Puerto que expone la API
+# Puerto API
 EXPOSE 8000
 
-# Health check — Docker verifica que
-# el contenedor está funcionando
+# Health check — 
+# verificar que el contenedor está funcionando
 HEALTHCHECK --interval=30s \
             --timeout=10s \
             --start-period=40s \

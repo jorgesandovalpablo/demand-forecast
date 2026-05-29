@@ -1,0 +1,40 @@
+# docker-compose.yml
+version: "3.9"
+
+services:
+
+  api:
+    build: .
+    container_name: demand-forecast-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      # Monta data y models como volúmenes
+      # para no tener que reconstruir la imagen
+      # cada vez que cambia un modelo
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f",
+             "http://localhost:8000/health"]
+      interval: 30s
+      timeout:  10s
+      retries:  3
+
+  # Opcional — MLflow UI local
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: mlflow-ui
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlflow:/mlflow
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri /mlflow
