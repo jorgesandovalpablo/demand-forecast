@@ -222,12 +222,15 @@ __pychcahe__/
 data/raw/
 data/processed/
 data/predictions/
+notebooks/figures/
 
 #logs 
 logs/
 
 #aux scrits while coding
 test_*.py
+notebook*.ipynb
+shap*.py
 
 #auxiliar test  
 test_build_festures.py
@@ -235,6 +238,6 @@ test_build_festures.py
 #os
 .DS_Store
 
-
+mlflow.db
 
 

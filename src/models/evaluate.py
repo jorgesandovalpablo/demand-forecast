@@ -407,7 +407,7 @@ def run_evaluation(horizon: int) -> dict:
     Retorna:
         dict con todas las métricas y análisis
     """
-    #setup_mlflow()
+    setup_mlflow()
     
     logger.info("=" * 50)
     logger.info(

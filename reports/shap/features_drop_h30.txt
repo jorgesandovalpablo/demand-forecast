@@ -1,0 +1,12 @@
+transferred
+semana_del_mes
+holiday_locale
+state
+holiday_impact_type
+oil_pct_change_30
+es_quincena
+es_post_festivo
+es_traslado
+es_festivo_regional
+es_festivo_local
+es_pre_festivo

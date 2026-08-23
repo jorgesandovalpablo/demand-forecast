@@ -335,7 +335,9 @@ markupsafe==3.0.3
 marshmallow==3.26.2
     # via dataclasses-json
 matplotlib==3.10.8
-    # via mlflow
+    # via
+    #   mlflow
+    #   seaborn
 matplotlib-inline==0.2.1
     # via
     #   ipykernel
@@ -378,6 +380,7 @@ numpy==2.4.3
     #   pandas
     #   scikit-learn
     #   scipy
+    #   seaborn
     #   shap
     #   skops
 omegaconf==2.3.0
@@ -432,6 +435,7 @@ pandas==2.3.3
     #   dagshub
     #   dagshub-annotation-converter
     #   mlflow
+    #   seaborn
     #   shap
 parso==0.8.7
     # via jedi
@@ -611,6 +615,8 @@ scmrepo==3.6.1
     # via
     #   dvc
     #   gto
+seaborn==0.13.2
+    # via -r requirements.in
 semver==3.0.4
     # via
     #   dagshub

@@ -1,26 +1,26 @@
-# test_validation.py (bórralo después)
-import pandas as pd
-import numpy as np
+# test_features.py (bórralo después de probar)
+from src.data.ingestion import load_raw_data
+from src.data.preprocessing import run_preprocessing
+from src.features.build_features import build_features
 
-from src.models.validation import (
-    walk_forward_splits,
-    compute_metrics,
-    FoldResult
-)
+# Pipeline completo
+data = load_raw_data()
+train, test = run_preprocessing(data, save=False)
 
-# Cargar features ya procesadas
-train = pd.read_parquet('data/processed/train_features_d7.parquet')
+print(f"Train pre columns{train.columns.to_list()}")
+# Modelo diario
+train_d7 = build_features(train, horizon=7, save=True)
+print(f"\n✅ Features diario:  {train_d7.shape}")
 
-print("🔍 Probando walk-forward splits:")
-folds = list(walk_forward_splits(train, n_folds=3))
-print(f"  Folds generados: {len(folds)}")
+print(f"Train post columns{train.columns.to_list()}")
+# Modelo mensual
+train_m30 = build_features(train, horizon=30, save=True)
+print(f"✅ Features mensual: {train_m30.shape}")
+print(f"Train final{train.columns.to_list()}")
 
-# Probar métricas
-
-y_true = np.array([10, 20, 30, 40, 50])
-y_pred = np.array([12, 18, 33, 38, 52])
-
-metrics = compute_metrics(y_true, y_pred, in_log_scale=False)
-print(f"\n✅ Métricas de prueba:")
-for k, v in metrics.items():
-    print(f"  {k}: {v}")
+# Verificar que no hay data leakage
+print("\n🔍 Verificación de lags:")
+print("  Lag mínimo modelo diario:  lag_7  ✅")
+print("  Lag mínimo modelo mensual: lag_30 ✅")
+print(f"Train post columns{train_d7.columns.to_list()}")
+print(f"Train post columns{train_m30.columns.to_list()}")

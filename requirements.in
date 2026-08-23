@@ -19,6 +19,7 @@ pre-commit
 python-dotenv
 pyarrow
 shap
+seaborn
 ipykernel
 optuna-integration[lightgbm]
 setuptools>=68
