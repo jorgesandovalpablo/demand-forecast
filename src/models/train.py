@@ -199,11 +199,11 @@ def _save_model(
     model: lgb.Booster,
     horizon: int,
     feature_cols: list,
-    df: pd.DataFrame,
+    pipeline,
     metrics: dict
-) -> Path:
+) -> tuple[Path, Path]:
     """
-    Guarda el modelo entrenado en disco
+    Guarda el modelo entrenado, el pipeline de features en disco
     y lo registra en MLflow.
     """
     models_path = Path("models")
@@ -217,31 +217,16 @@ def _save_model(
     features_path = models_path / f"features_h{horizon}.pkl"
     joblib.dump(feature_cols, features_path)
 
-    
-    # Guarda store stats — features estáticas
-    # calculadas sobre el historial completo
-    target      = config['data']['target']
-    store_stats = (
-        df.groupby(
-            ['store_nbr', 'family'],
-            observed=True
-        )[target]
-        .agg(['mean', 'std'])
-        .rename(columns={
-            'mean': 'venta_media_historica',
-            'std':  'venta_std_historica'
-        })
-        .reset_index()
-    )
-    stats_path = models_path / f"store_stats_h{horizon}.pkl"
-    joblib.dump(store_stats, stats_path)
+    # Guarda el pipeline de features
+    pipeline_path = models_path / f"feature_pipeline_h{horizon}.pkl"
+    pipeline.save(pipeline_path)
 
     logger.info(f"Modelo guardado:   {model_path}")
     logger.info(f"Features guardadas: {features_path}")
     logger.info(f"  Total features: {len(feature_cols)}")
-    logger.info(f"Store stats guardadas:{stats_path}")
+    logger.info(f"Pipeline guardado: {pipeline_path}")
 
-    return model_path
+    return model_path, pipeline_path
 
 # ─────────────────────────────────────────
 # Función principal — punto de entrada
@@ -269,12 +254,17 @@ def run_training(horizon: int) -> dict:
     )
     params = config['model'][params_key]
 
-    # Cargar features
-    features_path = (
-        f"data/processed/train_features_d{horizon}.parquet"
-    )
-    logger.info(f"Cargando features desde: {features_path}")
-    df = pd.read_parquet(features_path)
+    # Cargar features (Data Procesada, no Feature-Engineered)
+    features_path = "data/processed/train_processed.parquet"
+    logger.info(f"Cargando historial procesado desde: {features_path}")
+    df_processed = pd.read_parquet(features_path)
+    
+    # Construcción Stateful de Features
+    from src.features.build_features import DemandFeatureEngineer
+    pipeline = DemandFeatureEngineer(horizon)
+    pipeline.fit(df_processed)
+    df = pipeline.transform(df_processed, is_train=True)
+    
     feature_cols = get_feature_cols(df)
 
     logger.info("=" * 50)
@@ -357,10 +347,10 @@ def run_training(horizon: int) -> dict:
             best_n_estimators=best_n_estimators
         )
 
-        # Guardar y loggear modelo
-        model_path = _save_model(
+        # Guardar y loggear modelo y pipeline
+        model_path, pipeline_path = _save_model(
             final_model, horizon, feature_cols,
-            df,
+            pipeline,
             vars(summary)
         )
         mlflow.lightgbm.log_model(
@@ -368,6 +358,7 @@ def run_training(horizon: int) -> dict:
             artifact_path=model_name
         )
         mlflow.log_artifact(str(model_path))
+        mlflow.log_artifact(str(pipeline_path))
 
         logger.info("=" * 50)
         logger.info(" Entrenamiento completado")
@@ -384,7 +375,8 @@ def run_training(horizon: int) -> dict:
             'model':    final_model,
             'summary':  summary,
             'features': feature_cols,
-            'horizon':  horizon
+            'horizon':  horizon,
+            'df':       df
         }
 
 

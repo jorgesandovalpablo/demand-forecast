@@ -4,7 +4,7 @@ import joblib
 from pathlib import Path
 from src.utils.logger import get_logger
 from src.utils.config import config
-from src.features.build_features import build_features, _encode_categoricals
+from src.features.build_features import build_features
 from src.data.ingestion import load_raw_data
 from src.data.preprocessing import run_preprocessing
 
@@ -22,7 +22,7 @@ class ModelRegistry:
     """
     _models: dict = {}
     _features: dict = {}
-    _store_stats: dict = {}
+    _pipelines: dict = {}
 
     @classmethod
     def load(cls, horizon: int) -> object:
@@ -37,8 +37,8 @@ class ModelRegistry:
             features_path = Path(
                 f"models/features_h{horizon}.pkl"
             )
-            stats_path = Path(
-                f"models/store_stats_h{horizon}.pkl"
+            pipeline_path = Path(
+                f"models/feature_pipeline_h{horizon}.pkl"
             )
             
 
@@ -57,9 +57,9 @@ class ModelRegistry:
                     f"Features no encontradas: {features_path}\n"
                 )
 
-            if not stats_path.exists():
+            if not pipeline_path.exists():
                 raise FileNotFoundError(
-                    f"Store stats no encontradas: {stats_path}\n"
+                    f"Pipeline no encontrado: {pipeline_path}\n"
                 )
 
             logger.info(
@@ -68,7 +68,7 @@ class ModelRegistry:
             )
             cls._models[horizon] = joblib.load(model_path)
             cls._features[horizon] = joblib.load(features_path)
-            cls._store_stats[horizon] = joblib.load(stats_path)
+            cls._pipelines[horizon] = joblib.load(pipeline_path)
             logger.info(
                 f"Modelo horizon={horizon} cargado |"
                 f"Features: {len(cls._features[horizon])}"
@@ -84,11 +84,11 @@ class ModelRegistry:
         return cls._features[horizon]
 
     @classmethod
-    def get_store_stats(cls, horizon: int) -> list:
-        """Retorna las store stats del modelo cargado."""
-        if horizon not in cls._store_stats:
+    def get_pipeline(cls, horizon: int) -> object:
+        """Retorna el pipeline de features del modelo cargado."""
+        if horizon not in cls._pipelines:
             cls.load(horizon)
-        return cls._store_stats[horizon]
+        return cls._pipelines[horizon]
 
 
     @classmethod
@@ -96,7 +96,7 @@ class ModelRegistry:
         """Limpia el caché — útil después de retraining."""
         cls._models = {}
         cls._features = {}
-        cls._store_stats = {}
+        cls._pipelines = {}
         logger.info("Caché de modelos limpiado")
 
 
@@ -107,7 +107,7 @@ def prepare_prediction_data(
     historical_df: pd.DataFrame,
     future_dates: pd.DatetimeIndex,
     horizon: int,
-    store_stats: pd.DataFrame
+    pipeline: object
 ) -> pd.DataFrame:
     """
     Prepara el dataset para predecir fechas futuras.
@@ -119,6 +119,7 @@ def prepare_prediction_data(
         historical_df: DataFrame con historial procesado
         future_dates:  fechas para las que predecir
         horizon:       7 (diario) o 30 (mensual)
+        pipeline:      Instancia ajustada de DemandFeatureEngineer
 
     Retorna:
         DataFrame con features para predicción
@@ -150,11 +151,10 @@ def prepare_prediction_data(
     combined = pd.concat([historical_df, test], ignore_index=True)
     combined = combined.sort_values(['store_nbr', 'family', 'date'])
 
-    # 5. Build Features (Asegúrate que devuelva float32)
-    combined = build_features(combined, horizon=horizon, save=False)
+    # 5. Build Features usando el pipeline (estado congelado)
+    combined = pipeline.transform(combined, is_train=False)
 
     print("combined columns:", combined.columns.tolist())
-    print("store_stats columns:", store_stats.columns.tolist())
 
     combined.to_parquet("data/predictions/predict_df.parquet")
 
@@ -220,14 +220,14 @@ def predict(
         f"{future_dates[-1].date()}"
     )
 
-    store_stats = ModelRegistry.get_store_stats(horizon)
+    pipeline = ModelRegistry.get_pipeline(horizon)
 
     # Preparar features
     prediction_df = prepare_prediction_data(
         historical_df=reduced_history,
         future_dates=future_dates,
         horizon=horizon,
-        store_stats=store_stats
+        pipeline=pipeline
     )
 
     # Usa exactamente las features del entrenamiento
@@ -264,11 +264,7 @@ def predict(
             config['data']['target']: 'std_sales'
         })
     )
-    print('STD group:')
-    print(std_by_group.head())
-    print(f'Tipos:{std_by_group.info()}')
 
-    print('Results:')
     results = prediction_df[
         ['date', 'store_nbr', 'family']
     ].copy()
@@ -276,17 +272,16 @@ def predict(
         y_pred_real, 2
     )
 
-    print(results.head())
-
-    std_by_group = _encode_categoricals(std_by_group)
+    # Mapear categoricas (como family) para poder hacer merge
+    if 'family' in pipeline.categories_mapping:
+        cats = pipeline.categories_mapping['family']
+        std_by_group['family'] = pd.Categorical(std_by_group['family'], categories=cats).codes.astype('int16')
 
     results = pd.merge(
         results, std_by_group, 
         on=['store_nbr', 'family'],
         how='left'
     )
-
-    print(results['std_sales'])
 
     results['lower_bound'] = np.clip(
         results['predicted_sales'] -

@@ -252,34 +252,26 @@ def run_retraining(
             if v != float('inf'):
                 mlflow.log_metric(f"before_{k}", v)
 
-        # ── Paso 2: Ejecutar pipeline completo ──
+        # ── Paso 2: Ejecutar pipeline de datos ──
         logger.info("Ejecutando pipeline de datos...")
         data  = load_raw_data()
         train, _ = run_preprocessing(data, save=True)
-        df    = build_features(
-            train,
-            horizon=horizon,
-            save=True
-        )
 
         # ── Paso 3: Entrenar nuevo modelo ──
-        # Guardamos temporalmente como '_new'
-        # para no sobreescribir el actual todavía
         logger.info("Entrenando nuevo modelo...")
         result = run_training(horizon=horizon)
+        df = result['df']
 
-        # Renombrar modelo entrenado a '_new'
-        current_path = Path(
-            f"models/lgbm_h{horizon}.pkl"
-        )
-        new_path = Path(
-            f"models/lgbm_h{horizon}_new.pkl"
-        )
+        # Renombrar modelo entrenado y pipeline a '_new'
+        current_path = Path(f"models/lgbm_h{horizon}.pkl")
+        new_path = Path(f"models/lgbm_h{horizon}_new.pkl")
         if current_path.exists():
-            shutil.copy(
-                str(current_path),
-                str(new_path)
-            )
+            shutil.copy(str(current_path), str(new_path))
+            
+        current_pipeline_path = Path(f"models/feature_pipeline_h{horizon}.pkl")
+        new_pipeline_path = Path(f"models/feature_pipeline_h{horizon}_new.pkl")
+        if current_pipeline_path.exists():
+            shutil.copy(str(current_pipeline_path), str(new_pipeline_path))
 
         # ── Paso 4: Evaluar nuevo modelo ──
         new_metrics = _evaluate_new_model(horizon, df)
