@@ -1,0 +1,79 @@
+name: Weekly Retraining
+
+on:
+  schedule:
+    # Lunes 06:00 UTC (01:00 GMT-5 Ecuador)
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      horizon:
+        description: "Horizonte a reentrenar"
+        type: choice
+        options: ["7", "30"]
+        default: "7"
+      force:
+        description: "Promover sin comparar métricas"
+        type: boolean
+        default: false
+
+concurrency:
+  group: retraining
+  cancel-in-progress: true
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Download dataset from Kaggle
+        if: ${{ vars.KAGGLE_DOWNLOAD_ENABLED == 'true' }}
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+        run: |
+          mkdir -p data/raw
+          kaggle competitions download \
+            -c store-sales-time-series-forecasting \
+            -p data/raw --unzip
+
+      - name: Verify raw data availability
+        id: data_check
+        run: |
+          if [ ! -f data/raw/train.csv ]; then
+            echo "::warning::data/raw/train.csv no disponible. Configura el repo variable KAGGLE_DOWNLOAD_ENABLED=true y los secrets KAGGLE_USERNAME/KAGGLE_KEY."
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run safe retraining
+        if: steps.data_check.outputs.available == 'true'
+        env:
+          MLFLOW_TRACKING_USERNAME: ${{ secrets.MLFLOW_TRACKING_USERNAME }}
+          MLFLOW_TRACKING_PASSWORD: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+        run: |
+          python src/models/retrain.py \
+            --horizon ${{ inputs.horizon || '7' }} \
+            ${{ inputs.force == true && '--force' || '' }}
+
+      - name: Job summary
+        if: always()
+        run: |
+          echo "## Retraining ${{ inputs.horizon || '7' }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Resultado: ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Métricas y modelo promovido registrados en DagsHub (MLflow)" >> "$GITHUB_STEP_SUMMARY"
