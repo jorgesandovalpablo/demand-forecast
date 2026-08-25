@@ -12,6 +12,7 @@ from src.data.preprocessing import run_preprocessing
 from src.models.train import run_training, get_feature_cols
 from src.models.validation import compute_metrics
 from src.models.predict import ModelRegistry
+from src.models.registry import promote_local_artifacts
 
 logger = get_logger(__name__)
 
@@ -247,6 +248,9 @@ def run_retraining(
     """
     set_global_seed(config['project']['seed'])
 
+    from src.models.train import setup_mlflow
+    setup_mlflow()
+
     logger.info("=" * 50)
     logger.info(
         f"Iniciando reentrenamiento "
@@ -290,11 +294,17 @@ def run_retraining(
 
         # ── Paso 5: Decidir si actualizar ──
         model_updated = False
+        registry_version = None
         if force or _should_update_model(
             current_metrics, new_metrics
         ):
             _rotate_models(horizon)
             model_updated = True
+
+            # ── Paso 6: Versionar en el MLflow Model Registry ──
+            registry_version = promote_local_artifacts(
+                horizon, metrics=new_metrics
+            )
 
             # Limpiar caché para cargar
             # el nuevo modelo en la próxima predicción
@@ -321,10 +331,11 @@ def run_retraining(
         logger.info("=" * 50)
 
         return {
-            'horizon':        horizon,
-            'model_updated':  model_updated,
-            'metrics_before': current_metrics,
-            'metrics_after':  new_metrics
+            'horizon':         horizon,
+            'model_updated':   model_updated,
+            'registry_version': registry_version,
+            'metrics_before':  current_metrics,
+            'metrics_after':   new_metrics
         }
 
 
