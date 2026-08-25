@@ -3,7 +3,8 @@
 
 > Pipeline de ML end-to-end para predicción de demanda en minimercados de Ecuador.
 > Modelos LightGBM con horizontes de 7 y 30 días, MLflow tracking en DagsHub,
-> FastAPI deployment y retraining automático semanal vía GitHub Actions.
+> FastAPI deployment y retraining con promoción segura.
+> (⚠️ Retraining automático semanal vía GitHub Actions: pendiente)
 
 ![CI](https://github.com/jorgesandovalpablo/demand-forecast/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.10-blue)
@@ -96,49 +97,60 @@ preprocessing.py      → Merge correcto de 6 archivos
         ▼
 data/processed/train_processed.parquet
         │
-        ├─────────────────────────────────┐
-        ▼                                 ▼
-build_features(horizon=7)     build_features(horizon=30)
-  lags: 7,14,21,28,364          lags: 30,60,90,364
-  rolling: 7,14,28              rolling: 30,60,90
-        │                                 │
-        ▼                                 ▼
-train_features_d7.parquet    train_features_m30.parquet
-        │                                 │
-        ▼                                 ▼
-validation.py                  validation.py
-walk-forward CV (5 folds)      walk-forward CV (5 folds)
-        │                                 │
-        ▼                                 ▼
-train.py + MLflow              train.py + MLflow
-lgbm_h7.pkl                    lgbm_h30.pkl
-        │                                 │
-        └─────────────┬───────────────────┘
-                      ▼
-              predict.py
-              evaluate.py
-                      │
-                      ▼
-              FastAPI (main.py)
-              POST /predict
+        ├──────────────────────────────────────┐
+        ▼                                      ▼
+DemandFeatureEngineer(horizon=7)   DemandFeatureEngineer(horizon=30)
+  fit(): categorías, store_stats,    fit(): ídem
+         ranking global
+  transform(): lags, rolling,
+  festivos, promo, transacciones
+  (en memoria — sin parquet intermedio)
+        │                                      │
+        ▼                                      ▼
+validation.py                    validation.py
+walk-forward CV (5 folds)        walk-forward CV (5 folds)
+        │                                      │
+        ▼                                      ▼
+train.py + MLflow                train.py + MLflow
+lgbm_h7.pkl                      lgbm_h30.pkl
+features_h7.pkl                  features_h30.pkl
+feature_pipeline_h7.pkl          feature_pipeline_h30.pkl
+        │                                      │
+        └─────────────────┬────────────────────┘
+                          ▼
+                  predict.py / evaluate.py
+                  (cargan el pipeline serializado
+                   con .transform() → paridad garantizada)
+                          │
+                          ▼
+                  FastAPI (main.py)
+                  POST /predict
 ```
+
+> **Cambio clave:** las features ya no se persisten en parquets
+> intermedios (`train_features_d*.parquet`). El `DemandFeatureEngineer`
+> aprende su estado en `fit()` durante el entrenamiento y se serializa
+> junto al modelo; serving y evaluación reconstruyen features con
+> `.transform()` sobre ese estado congelado.
+
 
 **Pipeline de reentrenamiento automático:**
 
 ```
-GitHub Actions (cron semanal)
+Disparo manual / programado (⚠️ cron pendiente)
         │
         ▼
 retrain.py
-  ├── Ejecuta pipeline completo
-  ├── Entrena nuevo modelo
-  ├── Compara métricas (threshold 1% mejora)
-  ├── Si mejora → reemplaza modelo en producción
-  └── Si no mejora → mantiene modelo anterior
+  ├── Ejecuta pipeline completo a STAGING (_new)
+  ├── Producción NUNCA se toca durante el entrenamiento
+  ├── Evalúa el nuevo modelo sobre el test set (8 semanas)
+  ├── Compara métricas (threshold 1% mejora en MAE)
+  ├── Si mejora → promueve los 3 artefactos con backup timestamped
+  └── Si no mejora → descarta staging, mantiene producción
               │
               ▼
         MLflow registra versión
-        Backup del modelo anterior
+        Backups en models/*_backup_*.pkl (retención: 3)
 ```
 
 ---
@@ -152,18 +164,22 @@ retrain.py
 | **API** | FastAPI + Uvicorn | Serving de predicciones |
 | **Validación** | Pydantic v2 | Schemas de entrada/salida |
 | **Container** | Docker + docker-compose | Deployment reproducible |
-| **CI/CD** | GitHub Actions | Tests automáticos y retraining |
-| **Optimización** | Optuna | Búsqueda de hiperparámetros |
-| **Versionado datos** | DVC | Datos y modelos grandes |
+| **CI** | GitHub Actions | Tests automáticos en cada push |
+| **Optimización** | Optuna | ⚠️ Pendiente — declarado en requirements pero sin uso en src/ |
+| **Versionado datos** | DVC | ⚠️ Pendiente — declarado en requirements pero sin uso en src/ |
 | **Dependencias** | pip-tools | Versiones exactas y reproducibles |
 | **Calidad** | Black + Flake8 + isort | Estilo y linting automático |
-| **Tests** | pytest | Tests unitarios y de integración |
+| **Tests** | pytest | 16 tests unitarios/de integración (features y API) |
 
 ---
 
 ## 📊 Resultados
 
 ### Modelo Diario (horizon=7 días)
+
+> ⚠️ **Pendiente:** ejecutar `evaluate.py` con el pipeline actual para
+> poblar estas tablas. Las métricas de MLflow históricas corresponden a
+> versiones anteriores del feature engineering.
 
 | Métrica | CV Mean | CV Std | Test Set |
 |---|---|---|---|
@@ -183,7 +199,7 @@ retrain.py
 | WAPE | - | - | - |
 | RMSLE | - | - | - |
 
-> 📌 Métricas se actualizarán tras el entrenamiento completo en Kaggle Notebooks.
+> 📌 Métricas se actualizarán tras ejecutar `evaluate.py` con los artefactos vigentes.
 
 ### Top features más importantes
 
@@ -216,24 +232,25 @@ demand-forecast/
 │
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml              # Tests en cada push
-│       └── retrain.yml         # Retraining automático semanal
+│       └── ci.yml               # Tests en cada push
+│                                  (⚠️ retrain.yml semanal: pendiente)
 │
 ├── configs/
-│   └── config.yaml             # Fuente de verdad única del proyecto
+│   └── config.yaml              # Fuente de verdad única del proyecto
 │
 ├── data/
-│   ├── raw/                    # CSV originales — nunca se modifican
-│   ├── processed/              # Parquet generados por el pipeline
-│   └── predictions/            # Outputs del modelo
+│   ├── raw/                     # CSV originales — nunca se modifican
+│   ├── processed/               # Parquet generados por el pipeline
+│   └── predictions/            # Outputs del modelo y métricas por familia/tienda
 │
-├── models/                     # Modelos entrenados (.pkl)
-│   ├── lgbm_h7.pkl
-│   ├── lgbm_h30.pkl
-│   ├── features_h7.pkl         # Features exactas de entrenamiento
-│   ├── features_h30.pkl
-│   ├── store_stats_h7.pkl      # Estadísticas históricas por tienda
-│   └── store_stats_h30.pkl
+├── docs/
+│   └── SESSION_*.md             # Bitácora de sesiones de desarrollo
+│
+├── models/                      # Artefactos serializados por horizonte
+│   ├── lgbm_h{7,30}.pkl             # Booster LightGBM
+│   ├── features_h{7,30}.pkl         # Lista exacta de features de entrenamiento
+│   └── feature_pipeline_h{7,30}.pkl # DemandFeatureEngineer stateful (fit/transform)
+│   └── *_backup_*.pkl               # Backups del retraining (retención 3)
 │
 ├── notebooks/
 │   └── 01_eda.ipynb            # Análisis exploratorio completo
@@ -241,15 +258,15 @@ demand-forecast/
 ├── src/
 │   ├── data/
 │   │   ├── ingestion.py        # Carga y validación de esquema
-│   │   └── preprocessing.py   # Merge, nulos, log1p, memoria
+│   │   └── preprocessing.py    # Merge, nulos, log1p, memoria
 │   ├── features/
-│   │   └── build_features.py  # ~50 features por horizonte
+│   │   └── build_features.py   # DemandFeatureEngineer (fit/transform)
 │   ├── models/
-│   │   ├── validation.py      # Walk-forward cross validation
-│   │   ├── train.py           # LightGBM + MLflow tracking
+│   │   ├── validation.py      # Walk-forward cross validation + métricas
+│   │   ├── train.py           # LightGBM + MLflow + pipeline a staging
 │   │   ├── evaluate.py        # Métricas y análisis de errores
-│   │   ├── predict.py         # Inferencia + test set oficial
-│   │   └── retrain.py         # Pipeline de reentrenamiento
+│   │   ├── predict.py         # Inferencia + ModelRegistry con caché
+│   │   └── retrain.py         # Promoción segura: staging → comparación → producción
 │   ├── api/
 │   │   ├── main.py            # FastAPI endpoints
 │   │   └── schemas.py         # Pydantic validation
@@ -259,8 +276,8 @@ demand-forecast/
 │       └── seed.py            # Reproducibilidad global
 │
 ├── tests/
-│   ├── test_features.py       # Tests de feature engineering
-│   └── test_api.py            # Tests de endpoints
+│   ├── test_features.py       # Paridad train/serving del feature engineering
+│   └── test_api.py            # Contrato HTTP de la API (mockeado)
 │
 ├── logs/                      # Logs operacionales (no versionados)
 ├── .env.example               # Variables de entorno de ejemplo
@@ -336,30 +353,48 @@ data/raw/
 
 ### 5. Ejecutar el pipeline completo
 
+> **Importante (v0.2):** el feature engineering ya NO es un paso
+> independiente. `DemandFeatureEngineer` se ajusta (`fit()`) y aplica
+> (`transform()`) dentro del entrenamiento, y se serializa junto al modelo.
+> No ejecutes `build_features.py` manualmente — existe solo como puente
+> deprecated.
+
 ```bash
-# 1. Preprocessing
+# 1. Preprocessing (merge + nulos + log1p → train_processed.parquet)
 python src/data/preprocessing.py
 
-# 2. Feature engineering
-python src/features/build_features.py --horizon 7
-python src/features/build_features.py --horizon 30
-
-# 3. Entrenamiento
-# Recomendado ejecutar en Kaggle Notebooks o Google Colab
-# por capacidad de cómputo (16GB RAM disponibles gratis)
+# 2. Entrenamiento (por horizonte)
+#    - Ajusta y serializa DemandFeatureEngineer
+#    - Walk-forward CV + modelo final
+#    - Genera: lgbm_h{h}.pkl, features_h{h}.pkl, feature_pipeline_h{h}.pkl
+#    Recomendado en Kaggle/Colab por RAM (16GB gratis)
 python src/models/train.py --horizon 7
 python src/models/train.py --horizon 30
 
-# 4. Evaluación
+# 3. Evaluación sobre el test set (últimas 8 semanas)
+#    Reconstruye features vía el pipeline serializado
+#    Genera métricas globales/por familia/por tienda en data/predictions/
 python src/models/evaluate.py --horizon 7
 python src/models/evaluate.py --horizon 30
 
-# 5. Predicción sobre test set oficial
-python src/models/predict.py --horizon 7 --mode test
+# 4. Inferencia batch (simulación de forecast futuro)
+#    Usa el pipeline serializado para calcular lags con paridad garantizada
+python src/models/predict.py --horizon 7
+
+# 5. Reentrenamiento con promoción segura (opcional)
+#    Entrena a staging (_new), compara MAE vs producción:
+#    - Mejora ≥ 1% → promueve los 3 artefactos (backup automático)
+#    - No mejora   → descarta staging
+python src/models/retrain.py --horizon 7            # decisión por métricas
+python src/models/retrain.py --horizon 7 --force    # promoción forzada
 
 # 6. Iniciar API
 uvicorn src.api.main:app --reload --port 8000
 ```
+
+**Orden obligatorio:** `preprocessing` → `train` → (`evaluate` | `predict` | `retrain`) → `API`.
+Los modelos `.pkl` anteriores al pipeline stateful son **incompatibles**;
+si actualizas desde v0.1 reentrena desde el paso 2.
 
 ### 6. Con Docker
 
@@ -416,9 +451,13 @@ curl -X POST http://localhost:8000/predict \
   -d '{
     "store_nbr": 1,
     "horizon": 7,
-    "family": "GROCERY I"
+    "family": 3
   }'
 ```
+
+> `family` es el **código entero** del Label Encoding aprendido en
+> entrenamiento (ver `categories_mapping` dentro del pipeline serializado).
+> Si se omite, retorna todas las familias de la tienda.
 
 ```json
 {
@@ -429,7 +468,7 @@ curl -X POST http://localhost:8000/predict \
     {
       "date": "2017-09-01",
       "store_nbr": 1,
-      "family": "GROCERY I",
+      "family": 3,
       "predicted_sales": 245.30,
       "lower_bound": 198.20,
       "upper_bound": 292.40
@@ -494,13 +533,31 @@ Un merge simple por fecha genera duplicados (53,460 filas detectadas en EDA).
 La corrección usa merge diferenciado: nacional por `date`, regional por
 `date + state`, local por `date + city`, con prioridad local > regional > nacional.
 
-### ¿Por qué guardar features y store stats junto al modelo?
+### ¿Por qué un pipeline de features stateful (fit/transform)?
 
-Durante predicción el dataset nuevo no tiene el mismo historial que el de
-entrenamiento. Las store stats (`venta_media_historica`, `venta_std_historica`)
-deben calcularse sobre el historial completo de entrenamiento, no sobre los
-datos de inferencia. Guardándolas junto al modelo se garantiza consistencia
-entre entrenamiento y predicción.
+En la v0.1 el feature engineering se recalculaba en cada etapa con
+funciones independientes. Eso rompía la paridad train/serving:
+
+- El Label Encoding recodificaba categorías según el subset recibido
+  (al filtrar una tienda en la API, todo colapsaba a `0`).
+- El ranking de tiendas se recalculaba sobre el subset (siempre rank 1).
+- Las stats por tienda se computaban sobre la ventana de inferencia,
+  no sobre el historial completo.
+
+La solución es un único componente (`DemandFeatureEngineer`) que en
+`fit()` congela vocabularios, stats y rankings sobre el histórico
+completo, y en `transform()` los aplica rígidamente. Se serializa junto
+al modelo, garantizando que serving y evaluación usen exactamente el
+mismo estado que vio el entrenamiento. Cubierto por tests de paridad
+(`tests/test_features.py`).
+
+### ¿Por qué promoción segura en el retraining?
+
+Entrenar directamente sobre producción implicaba que un modelo peor
+igual sobrescribía los artefactos vigentes antes de comparar métricas.
+Ahora `retrain.py` entrena a staging (`*_new.pkl`), evalúa sobre el
+test set reservado, y solo si supera el modelo vigente (≥1% de mejora
+en MAE) promueve los 3 artefactos con backup timestamped para rollback.
 
 ---
 
@@ -545,9 +602,54 @@ Experimentos trackeados en DagsHub:
 https://dagshub.com/jorgesandovalpablo/demand-forecast
 ```
 
+## ⚠️ Estado actual y limitaciones
+
+Última actualización: 2026-08-25.
+
+### Implementado y verificado
+- Pipeline de features stateful con paridad train/serving testada (16 tests).
+- Promoción segura en retraining (staging → comparación → producción con backups).
+- `evaluate.py` reconstruyendo features desde el pipeline serializado.
+- Intervalos de confianza calculados en escala log desde las stats históricas completas.
+
+### Pendientes
+| Ítem | Detalle |
+|---|---|
+| Métricas en README | Poblar tras ejecutar `evaluate.py` con artefactos vigentes |
+| `retrain.yml` semanal | Workflow de GitHub Actions para retraining programado no existe (solo `ci.yml`) |
+| Optuna | Declarado en requirements sin uso en `src/` |
+| DVC | Declarado en requirements sin uso; datos/modelos fuera de git |
+| SHAP | Import comentado en `evaluate.py`; reports/shap son de versiones anteriores |
+
+### Limitaciones conocidas (deuda técnica aceptada)
+- **OOM potencial en la API:** `main.py` carga el histórico completo
+  (`train_processed.parquet`) en RAM. Válido como portafolio; en producción
+  real requeriría una tienda de features externa (Redis/DB).
+- **Inferencia por recálculo:** cada `/predict` reconstruye lags sobre el
+  historial concatenado; no hay cache incremental de features.
+- **`mlruns/` versionado en git:** debería moverse a `.gitignore` o backend remoto exclusivo.
+- **Config residual:** clave `lambda_l1` duplicada en `params_lgbm_mensual`
+  (la segunda sobrescribe) y archivo `configs/config.yaml.save` huérfano.
+
 ---
 
 ## 📝 CHANGELOG
+
+### v0.2.0 (2026-08-25)
+- **Pipeline de features stateful:** `DemandFeatureEngineer` con patrón
+  fit/transform; elimina la ruptura de paridad train/serving
+  (label encoding destructivo, ranking colapsado, stats recalculadas).
+- **Serialización del pipeline:** `feature_pipeline_h{h}.pkl` viaja junto al
+  booster; serving y evaluación reconstruyen features con `.transform()`.
+- **Promoción segura en retraining:** entrenamiento a staging (`_new`),
+  comparación por MAE y rotación de los 3 artefactos con backups timestamped.
+- **`evaluate.py` reparado:** ya no depende de parquets intermedios eliminados.
+- **Intervalos de confianza corregidos:** cuantiles calculados en escala log
+  a partir de `store_stats` completa (antes: std sobre ventana de 365 días).
+- **Paridad de dtypes en serving:** `_reduce_memory` aplicado en rama predict.
+- **Fix en API:** filtro por familia devolvía 500 en vez de 404.
+- **Tests:** 16 tests (paridad de features + contrato HTTP) y linting limpio.
+- Config externalizada: `model.top_families` movida a `config.yaml`.
 
 ### v0.1.0
 - Pipeline completo de datos con corrección de merge de holidays
