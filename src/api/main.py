@@ -8,10 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.utils.logger import get_logger
 from src.utils.config import config
 from src.models.predict import (
-    predict,
     predict_by_store,
-    ModelRegistry,
-    save_predictions
+    ModelRegistry
 )
 from src.api.schemas import (
     PredictionRequest,
@@ -247,6 +245,8 @@ async def get_predictions(request: PredictionRequest):
             predictions=items
         )
 
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(
             status_code=400,
