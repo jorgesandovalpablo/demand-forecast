@@ -3,8 +3,7 @@
 
 > Pipeline de ML end-to-end para predicción de demanda en minimercados de Ecuador.
 > Modelos LightGBM con horizontes de 7 y 30 días, MLflow tracking en DagsHub,
-> FastAPI deployment y retraining con promoción segura.
-> (⚠️ Retraining automático semanal vía GitHub Actions: pendiente)
+> FastAPI deployment y retraining con promoción segura (cron semanal vía GitHub Actions).
 
 ![CI](https://github.com/jorgesandovalpablo/demand-forecast/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.10-blue)
@@ -232,8 +231,8 @@ demand-forecast/
 │
 ├── .github/
 │   └── workflows/
-│       └── ci.yml               # Tests en cada push
-│                                  (⚠️ retrain.yml semanal: pendiente)
+│       ├── ci.yml              # Lint + tests en cada push/PR
+│       └── retrain.yml         # Retraining semanal (cron) o manual
 │
 ├── configs/
 │   └── config.yaml              # Fuente de verdad única del proyecto
@@ -615,8 +614,8 @@ https://dagshub.com/jorgesandovalpablo/demand-forecast
 ### Pendientes
 | Ítem | Detalle |
 |---|---|
-| Métricas en README | Poblar tras ejecutar `evaluate.py` con artefactos vigentes |
-| `retrain.yml` semanal | Workflow de GitHub Actions para retraining programado no existe (solo `ci.yml`) |
+| Métricas en README | Poblar tras ejecutar `evaluate.py` (guía: `docs/VALIDATION_GUIDE.md`) |
+| Secrets de CI | Configurar `MLFLOW_TRACKING_USERNAME/PASSWORD` y opcionalmente `KAGGLE_USERNAME/KEY` + repo variable `KAGGLE_DOWNLOAD_ENABLED=true` para el retraining programado |
 | Optuna | Declarado en requirements sin uso en `src/` |
 | DVC | Declarado en requirements sin uso; datos/modelos fuera de git |
 | SHAP | Import comentado en `evaluate.py`; reports/shap son de versiones anteriores |
@@ -627,9 +626,6 @@ https://dagshub.com/jorgesandovalpablo/demand-forecast
   real requeriría una tienda de features externa (Redis/DB).
 - **Inferencia por recálculo:** cada `/predict` reconstruye lags sobre el
   historial concatenado; no hay cache incremental de features.
-- **`mlruns/` versionado en git:** debería moverse a `.gitignore` o backend remoto exclusivo.
-- **Config residual:** clave `lambda_l1` duplicada en `params_lgbm_mensual`
-  (la segunda sobrescribe) y archivo `configs/config.yaml.save` huérfano.
 
 ---
 
