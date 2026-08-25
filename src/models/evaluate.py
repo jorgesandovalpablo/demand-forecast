@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from src.utils.logger import get_logger
 from src.utils.config import config
+from src.features.build_features import DemandFeatureEngineer
 from src.models.validation import compute_metrics
 from src.models.train import setup_mlflow
 
@@ -94,12 +95,16 @@ def evaluate_by_family(
     """
     logger.info("Calculando métricas por familia...")
     target   = config['data']['target']
+    top_families = config['model']['top_families']
     test_df  = test_df.copy()
     test_df['y_pred'] = y_pred
 
     test_df['abs_error'] = np.abs(test_df[target] - y_pred)
     family_wape = test_df.groupby('family').apply(lambda x: x['abs_error'].sum() / x[target].sum()).copy()
-    print(family_wape.loc[[3, 7, 12, 30]])
+    logger.info(
+        f"WAPE familias prioritarias {top_families}:\n"
+        f"{family_wape.loc[top_families].to_string()}"
+    )
 
     results = []
     for family, group in test_df.groupby('family'):
@@ -203,8 +208,6 @@ def evaluate_by_time(
             'std':  'std_diario'
         })
     )
-
-    print(time_metrics.head())
 
     top_time = (
         time_metrics.
@@ -416,19 +419,30 @@ def run_evaluation(horizon: int) -> dict:
     )
     logger.info("=" * 50)
 
-    # Cargar modelo y features
-    model_path    = Path(f"models/lgbm_h{horizon}.pkl")
-    features_path = (
-        f"data/processed/"
-        f"train_features_d{horizon}.parquet"
-    )
+    # Cargar modelo y reconstruir features con el pipeline serializado
+    model_path = Path(f"models/lgbm_h{horizon}.pkl")
+    pipeline_path = Path(f"models/feature_pipeline_h{horizon}.pkl")
+    features_path = Path(f"models/features_h{horizon}.pkl")
+    processed_path = Path("data/processed/train_processed.parquet")
+
+    if not model_path.exists():
+        raise FileNotFoundError(
+            f"Modelo no encontrado: {model_path}. "
+            f"Ejecuta primero train.py --horizon {horizon}"
+        )
+    if not processed_path.exists():
+        raise FileNotFoundError(
+            "No se encontró train_processed.parquet. "
+            "Ejecuta primero: python src/data/preprocessing.py"
+        )
 
     model = joblib.load(model_path)
-    df    = pd.read_parquet(features_path)
+    pipeline = DemandFeatureEngineer.load(pipeline_path)
+    feature_cols = joblib.load(features_path)
 
-    # Feature cols
-    from src.models.train import get_feature_cols
-    feature_cols = get_feature_cols(df)
+    logger.info(f"Cargando historial procesado desde: {processed_path}")
+    df_processed = pd.read_parquet(processed_path)
+    df = pipeline.transform(df_processed, is_train=True)
 
     # Test set
     X_test, y_test, test_df = prepare_test_set(
