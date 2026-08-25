@@ -71,7 +71,7 @@ Esperado:
 - Parquet en `data/predictions/predictions_daily_YYYYMMDD.parquet`.
 - **Sin** `predict_df.parquet` generado (side-effect eliminado).
 
-## Paso 5 — Promoción segura
+## Paso 5 — Promoción segura + Model Registry
 
 ```bash
 # Primera pasada: decisión por métricas (probablemente acepte: inf baseline)
@@ -88,6 +88,28 @@ Esperado:
 - Segunda pasada (`--force`): backups timestamped de los 3 artefactos
   (`*_backup_*.pkl`) y staging `_new` eliminado tras rotar.
 - Run `retrain_h7_YYYYMMDD` en DagsHub con `model_updated=true`.
+- **Registry (requiere credenciales DagsHub en `.env`):**
+  - Log `Modelo registrado en el registry: demand-forecast-daily@production (vN)`.
+  - En DagsHub → Models: versión nueva con tags `horizon`, `test_mae`,
+    `test_wape`, `promoted_at` y alias `production`.
+- Si el registro falla: warning en logs, promoción local intacta.
+
+### Verificar recuperación desde el registry
+
+```bash
+mv models/lgbm_h7.pkl /tmp/lgbm_backup.pkl
+python -c "from src.models.predict import ModelRegistry; m = ModelRegistry.load(7); print(type(m))"
+mv /tmp/lgbm_backup.pkl models/lgbm_h7.pkl
+```
+
+Esperado: warning `Artefactos locales incompletos... consultando el
+registry`, descarga de la versión `@production` a `models/` y carga OK.
+
+### Rollback manual
+
+```bash
+python -c "from src.models.registry import rollback_production; rollback_production(7, <version_anterior>)"
+```
 
 ## Paso 6 — API
 

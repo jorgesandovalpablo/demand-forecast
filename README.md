@@ -601,6 +601,35 @@ Experimentos trackeados en DagsHub:
 https://dagshub.com/jorgesandovalpablo/demand-forecast
 ```
 
+## 🗄️ Model Registry (DagsHub)
+
+El MLflow Model Registry es la fuente de verdad versionada de los
+modelos productivos. Estrategia **local primero**: `models/` tiene
+prioridad; el registry actúa como respaldo y mecanismo de recuperación.
+
+```
+retrain.py (promoción local exitosa)
+        │
+        ▼
+registry.py → log de los 3 artefactos en run dedicado
+        │      + register_model() → nueva versión
+        ▼
+demand-forecast-daily@production   /   demand-forecast-monthly@production
+(tags: horizon, test_mae, test_wape, promoted_at)
+```
+
+| Operación | Cómo |
+|---|---|
+| Promoción | Automática tras cada retraining aceptado |
+| Recuperación | `ModelRegistry.load()` descarga `@production` si faltan artefactos locales |
+| Rollback | `rollback_production(horizon, version)` reasigna el alias |
+| Fallo de registro | No bloquea: la promoción local se mantiene operativa |
+
+> Útil para CI: el runner efímero del cron puede recuperar el modelo
+> productivo sin almacenar `.pkl` en git.
+
+---
+
 ## ⚠️ Estado actual y limitaciones
 
 Última actualización: 2026-08-25.
