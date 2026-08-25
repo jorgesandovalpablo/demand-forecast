@@ -1,7 +1,7 @@
 project:
   name: "demand-forecast"
   seed: 42
-  version: "0.1.1"
+  version: "0.2.0"
 
 paths:
   data_raw: "data/raw/"
