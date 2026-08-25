@@ -28,6 +28,10 @@ class ModelRegistry:
         """
         Carga el modelo si no está en caché.
         Si ya está cargado, lo retorna directo.
+
+        Estrategia local-primero: usa los artefactos de models/;
+        si falta alguno intenta recuperarlos desde la versión
+        'production' del MLflow Model Registry antes de fallar.
         """
         if horizon not in cls._models:
             model_path = Path(
@@ -39,27 +43,26 @@ class ModelRegistry:
             pipeline_path = Path(
                 f"models/feature_pipeline_h{horizon}.pkl"
             )
-            
 
-            if not model_path.exists():
-                logger.error(
-                    f"Modelo no encontrado: {model_path}"
-                )
-                raise FileNotFoundError(
-                    f"Modelo no entrenado para "
-                    f"horizonte {horizon}. "
-                    f"Ejecuta primero train.py"
-                )
+            artifacts_missing = not all([
+                model_path.exists(),
+                features_path.exists(),
+                pipeline_path.exists()
+            ])
 
-            if not features_path.exists():
-                raise FileNotFoundError(
-                    f"Features no encontradas: {features_path}\n"
+            if artifacts_missing:
+                logger.warning(
+                    f"Artefactos locales incompletos para "
+                    f"horizon={horizon}; consultando el registry..."
                 )
-
-            if not pipeline_path.exists():
-                raise FileNotFoundError(
-                    f"Pipeline no encontrado: {pipeline_path}\n"
-                )
+                from src.models.registry import ensure_local_artifacts
+                if not ensure_local_artifacts(horizon):
+                    raise FileNotFoundError(
+                        f"Modelo no disponible para horizonte {horizon}: "
+                        f"sin artefactos locales y sin versión "
+                        f"'production' en el registry. "
+                        f"Ejecuta train.py --horizon {horizon}"
+                    )
 
             logger.info(
                 f"Cargando modelo horizon={horizon} "
