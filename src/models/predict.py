@@ -4,7 +4,6 @@ import joblib
 from pathlib import Path
 from src.utils.logger import get_logger
 from src.utils.config import config
-from src.features.build_features import build_features
 from src.data.ingestion import load_raw_data
 from src.data.preprocessing import run_preprocessing
 
@@ -154,10 +153,6 @@ def prepare_prediction_data(
     # 5. Build Features usando el pipeline (estado congelado)
     combined = pipeline.transform(combined, is_train=False)
 
-    print("combined columns:", combined.columns.tolist())
-
-    combined.to_parquet("data/predictions/predict_df.parquet")
-
     # 6. Extraer solo futuro y liberar memoria
     start_date = future_dates.min()
     prediction_df = combined[combined['date'] >= start_date].copy()
@@ -250,20 +245,18 @@ def predict(
     y_pred_real = np.expm1(y_pred_log)
     y_pred_real = np.clip(y_pred_real, 0, None)
 
-    # Intervalo de confianza simple
-    # basado en la desviación histórica
-    # por tienda-familia
-    std_by_group = (
-        historical_df.groupby(
-            ['store_nbr', 'family']
-        )[config['data']['target']]
-        .std()
-        .apply(np.expm1)
-        .reset_index()
-        .rename(columns={
-            config['data']['target']: 'std_sales'
-        })
-    )
+    # Intervalo de confianza basado en la desviación
+    # histórica completa aprendida en fit() (escala log).
+    std_by_group = pipeline.store_stats[
+        ['store_nbr', 'family', 'venta_std_historica']
+    ].rename(columns={'venta_std_historica': 'std_sales'})
+
+    if 'family' in pipeline.categories_mapping:
+        cats = pipeline.categories_mapping['family']
+        std_by_group['family'] = (
+            pd.Categorical(std_by_group['family'], categories=cats)
+            .codes.astype('int16')
+        )
 
     results = prediction_df[
         ['date', 'store_nbr', 'family']
@@ -272,25 +265,19 @@ def predict(
         y_pred_real, 2
     )
 
-    # Mapear categoricas (como family) para poder hacer merge
-    if 'family' in pipeline.categories_mapping:
-        cats = pipeline.categories_mapping['family']
-        std_by_group['family'] = pd.Categorical(std_by_group['family'], categories=cats).codes.astype('int16')
-
     results = pd.merge(
-        results, std_by_group, 
+        results, std_by_group,
         on=['store_nbr', 'family'],
         how='left'
     )
 
+    # Cuantiles en escala log y luego revertir log1p
     results['lower_bound'] = np.clip(
-        results['predicted_sales'] -
-        1.96 * results['std_sales'],
+        np.expm1(y_pred_log - 1.96 * results['std_sales']),
         0, None
     ).round(2)
-    results['upper_bound'] = (
-        results['predicted_sales'] +
-        1.96 * results['std_sales'] * 1.5
+    results['upper_bound'] = np.expm1(
+        y_pred_log + 1.96 * results['std_sales'] * 1.5
     ).round(2)
 
     results = results.drop(columns=['std_sales'])

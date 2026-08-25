@@ -187,7 +187,7 @@ class DemandFeatureEngineer:
         return df
 
     def _build_lag_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        logger.info(f"  Construyendo lag features...")
+        logger.info("  Construyendo lag features...")
         group = ['store_nbr', 'family']
         target = config['data']['target']
         lags = self._select_windows_lag()

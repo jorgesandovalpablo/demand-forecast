@@ -328,6 +328,7 @@ def run_preprocessing(data: dict,
         )
         train =  pd.DataFrame()
         test = _handle_nulls(test)
+        test = _reduce_memory(test)
 
     else:
         logger.info("Procesando TRAIN...")
