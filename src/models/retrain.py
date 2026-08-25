@@ -1,4 +1,3 @@
-import numpy as np
 import pandas as pd
 import mlflow
 import joblib
@@ -10,7 +9,6 @@ from src.utils.config import config
 from src.utils.seed import set_global_seed
 from src.data.ingestion import load_raw_data
 from src.data.preprocessing import run_preprocessing
-from src.features.build_features import build_features
 from src.models.train import run_training, get_feature_cols
 from src.models.validation import compute_metrics
 from src.models.predict import ModelRegistry
@@ -163,34 +161,49 @@ def _should_update_model(
 # ─────────────────────────────────────────
 # 4. Rotar modelos
 # ─────────────────────────────────────────
+ARTIFACT_KINDS = ["lgbm_h", "features_h", "feature_pipeline_h"]
+
+
+def _artifact_paths(horizon: int, suffix: str = "") -> list[Path]:
+    """Retorna las rutas de los 3 artefactos de un horizonte."""
+    return [
+        Path(f"models/{kind}{horizon}{suffix}.pkl")
+        for kind in ARTIFACT_KINDS
+    ]
+
+
 def _rotate_models(horizon: int) -> None:
     """
-    Reemplaza el modelo en producción
-    con el nuevo modelo entrenado.
+    Promueve los artefactos de staging ('_new') a producción.
 
-    Guarda el modelo anterior como backup
+    Guarda backup timestamped de cada artefacto de producción
     por si necesitas hacer rollback.
     """
-    current_path = Path(f"models/lgbm_h{horizon}.pkl")
-    new_path     = Path(f"models/lgbm_h{horizon}_new.pkl")
-    backup_path  = Path(
-        f"models/lgbm_h{horizon}_backup_"
-        f"{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        f".pkl"
-    )
+    timestamp   = datetime.now().strftime('%Y%m%d_%H%M%S')
+    new_paths   = _artifact_paths(horizon, suffix="_new")
+    current_paths = _artifact_paths(horizon)
 
-    # Backup del modelo actual
-    if current_path.exists():
-        shutil.copy(current_path, backup_path)
-        logger.info(f"Backup guardado: {backup_path}")
+    for new_path, current_path in zip(new_paths, current_paths):
+        if not new_path.exists():
+            raise FileNotFoundError(
+                f"Artefacto de staging no encontrado: {new_path}"
+            )
 
-    # Reemplazar modelo en producción
-    shutil.move(str(new_path), str(current_path))
-    logger.info(
-        f"Modelo actualizado: {current_path}"
-    )
+        if current_path.exists():
+            backup_path = current_path.with_name(
+                f"{current_path.stem}_backup_{timestamp}.pkl"
+            )
+            shutil.copy(current_path, backup_path)
+            logger.info(f"Backup guardado: {backup_path}")
 
-    # Limpiar backups antiguos
+        shutil.move(str(new_path), str(current_path))
+        logger.info(f"Artefacto actualizado: {current_path}")
+
+    for stale_new in Path("models").glob(f"*h{horizon}_new.pkl"):
+        logger.warning(f"Artefacto staging residual eliminado: {stale_new}")
+        stale_new.unlink()
+
+    # Limpiar backups antiguos del booster
     # Mantener solo los últimos 3
     backups = sorted(
         Path("models").glob(
@@ -203,6 +216,14 @@ def _rotate_models(horizon: int) -> None:
             logger.info(
                 f"Backup antiguo eliminado: {old_backup}"
             )
+
+
+def _discard_staging(horizon: int) -> None:
+    """Elimina los artefactos de staging de un modelo rechazado."""
+    for new_path in _artifact_paths(horizon, suffix="_new"):
+        if new_path.exists():
+            new_path.unlink()
+            logger.info(f"Artefacto staging eliminado: {new_path}")
 
 
 # ─────────────────────────────────────────
@@ -257,21 +278,10 @@ def run_retraining(
         data  = load_raw_data()
         train, _ = run_preprocessing(data, save=True)
 
-        # ── Paso 3: Entrenar nuevo modelo ──
-        logger.info("Entrenando nuevo modelo...")
-        result = run_training(horizon=horizon)
+        # ── Paso 3: Entrenar nuevo modelo a staging ──
+        logger.info("Entrenando nuevo modelo (staging)...")
+        result = run_training(horizon=horizon, output_suffix="_new")
         df = result['df']
-
-        # Renombrar modelo entrenado y pipeline a '_new'
-        current_path = Path(f"models/lgbm_h{horizon}.pkl")
-        new_path = Path(f"models/lgbm_h{horizon}_new.pkl")
-        if current_path.exists():
-            shutil.copy(str(current_path), str(new_path))
-            
-        current_pipeline_path = Path(f"models/feature_pipeline_h{horizon}.pkl")
-        new_pipeline_path = Path(f"models/feature_pipeline_h{horizon}_new.pkl")
-        if current_pipeline_path.exists():
-            shutil.copy(str(current_pipeline_path), str(new_pipeline_path))
 
         # ── Paso 4: Evaluar nuevo modelo ──
         new_metrics = _evaluate_new_model(horizon, df)
@@ -293,9 +303,7 @@ def run_retraining(
                 " Modelo en producción actualizado"
             )
         else:
-            # Eliminar nuevo modelo rechazado
-            if new_path.exists():
-                new_path.unlink()
+            _discard_staging(horizon)
             logger.warning(
                 " Modelo anterior mantenido "
                 "en producción"

@@ -84,9 +84,9 @@ def _train_fold(
     X_val   = df.loc[val_idx, feature_cols]
     y_val   = df.loc[val_idx, target]
 
-    top_families = [3, 7, 12, 30] # Define tus 5 familias
+    top_families = config['model']['top_families']
     w_train = np.ones(len(y_train))
-    w_train[df.loc[train_idx, 'family'].isin(top_families)] = 5
+    w_train[df.loc[train_idx, 'family'].isin(top_families)] = config['training']['weight_value']
 
     # Dataset de LightGBM
     train_data = lgb.Dataset(X_train, label=y_train, weight=w_train)
@@ -169,7 +169,7 @@ def _train_final_model(
     X = train_df[feature_cols]
     y = train_df[target]
 
-    top_families = [3, 7, 12, 30]
+    top_families = config['model']['top_families']
     final_weights = np.ones(len(y))
     final_weights[train_df['family'].isin(top_families)] = config['training']['weight_value']
 
@@ -200,25 +200,26 @@ def _save_model(
     horizon: int,
     feature_cols: list,
     pipeline,
-    metrics: dict
+    metrics: dict,
+    output_suffix: str = ""
 ) -> tuple[Path, Path]:
     """
     Guarda el modelo entrenado, el pipeline de features en disco
     y lo registra en MLflow.
+
+    El parámetro output_suffix permite escribir a un artefacto de
+    staging (ej. '_new') sin tocar los artefactos de producción.
     """
     models_path = Path("models")
     models_path.mkdir(exist_ok=True)
 
-    # Guarda el modelo
-    model_path = models_path / f"lgbm_h{horizon}.pkl"
+    model_path = models_path / f"lgbm_h{horizon}{output_suffix}.pkl"
     joblib.dump(model, model_path)
 
-    # Guarda las features — clave para predict
-    features_path = models_path / f"features_h{horizon}.pkl"
+    features_path = models_path / f"features_h{horizon}{output_suffix}.pkl"
     joblib.dump(feature_cols, features_path)
 
-    # Guarda el pipeline de features
-    pipeline_path = models_path / f"feature_pipeline_h{horizon}.pkl"
+    pipeline_path = models_path / f"feature_pipeline_h{horizon}{output_suffix}.pkl"
     pipeline.save(pipeline_path)
 
     logger.info(f"Modelo guardado:   {model_path}")
@@ -231,7 +232,7 @@ def _save_model(
 # ─────────────────────────────────────────
 # Función principal — punto de entrada
 # ─────────────────────────────────────────
-def run_training(horizon: int) -> dict:
+def run_training(horizon: int, output_suffix: str = "") -> dict:
     """
     Ejecuta el pipeline completo de entrenamiento
     para un horizonte específico.
@@ -239,6 +240,9 @@ def run_training(horizon: int) -> dict:
     Parámetros:
         horizon: 7 → modelo diario
                  30 → modelo mensual
+        output_suffix: sufijo para los artefactos de salida.
+                       Vacío escribe en producción; '_new'
+                       escribe a staging (usado por retrain.py).
 
     Retorna:
         dict con modelo entrenado y métricas
@@ -351,7 +355,8 @@ def run_training(horizon: int) -> dict:
         model_path, pipeline_path = _save_model(
             final_model, horizon, feature_cols,
             pipeline,
-            vars(summary)
+            vars(summary),
+            output_suffix=output_suffix
         )
         mlflow.lightgbm.log_model(
             final_model,
