@@ -239,6 +239,7 @@ test_build_festures.py
 .DS_Store
 
 mlflow.db
+mlruns/
 
 #archivos antigravity
 AGENTS.md
