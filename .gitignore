@@ -228,7 +228,7 @@ notebooks/figures/
 logs/
 
 #aux scrits while coding
-test_*.py
+/test_*.py
 notebook*.ipynb
 shap*.py
 
