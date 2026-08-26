@@ -79,10 +79,10 @@ secrets), @tarquinen/opencode-dcp (poda de contexto), opencode-notify
 
 | # | Ítem | Detalle |
 |---|---|---|
-| 1 | Optuna | Tuning de hiperparámetros por horizonte con walk-forward como backend (declarado en requirements, sin uso) |
-| 2 | SHAP refresh | Regenerar reports/shap con el pipeline vigente |
-| 3 | OOM API mitigación | Historial perezoso o caché de features (deuda B) |
-| 4 | Contrato API | Aceptar family por nombre además de código entero |
+| 1 | OOM API mitigación | Cutoff temporal en lifespan usando `config['lags']['max_lag']` compartido con `predict.py` (deuda B) |
+| 2 | Contrato API family por nombre | `schemas.py` acepta `str`, traducción nombre↔código vía `pipeline.categories_mapping` |
+| 3 | SHAP refresh | Reescribir `shap_analysis.py` (raíz obsoleto) migrando a `src/` vía `ModelRegistry.load()` |
+| 4 | Optuna | Tuning de hiperparámetros por horizonte con walk-forward como backend (`src/models/tune.py` nuevo, diseño con subsampleo) |
 
 ## Gotchas técnicos relevantes para futuros agentes
 
