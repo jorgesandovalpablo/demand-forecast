@@ -176,29 +176,28 @@ retrain.py
 
 ### Modelo Diario (horizon=7 días)
 
-> ⚠️ **Pendiente:** ejecutar `evaluate.py` con el pipeline actual para
-> poblar estas tablas. Las métricas de MLflow históricas corresponden a
-> versiones anteriores del feature engineering.
-
-| Métrica | CV Mean | CV Std | Test Set |
-|---|---|---|---|
-| RMSE | - | - | - |
-| MAE | - | - | - |
-| MAPE | - | - | - |
-| WAPE | - | - | - |
-| RMSLE | - | - | - |
+| Métrica | Test Set |
+|---|---|
+| RMSE | 202.18 |
+| MAE | 53.33 |
+| MAPE | 33.35% |
+| WAPE | **11.27%** |
+| RMSLE | 0.3973 |
 
 ### Modelo Mensual (horizon=30 días)
 
-| Métrica | CV Mean | CV Std | Test Set |
-|---|---|---|---|
-| RMSE | - | - | - |
-| MAE | - | - | - |
-| MAPE | - | - | - |
-| WAPE | - | - | - |
-| RMSLE | - | - | - |
+| Métrica | Test Set |
+|---|---|
+| RMSE | 291.48 |
+| MAE | 81.22 |
+| MAPE | 39.19% |
+| WAPE | **17.16%** |
+| RMSLE | 0.4359 |
 
-> 📌 Métricas se actualizarán tras ejecutar `evaluate.py` con los artefactos vigentes.
+> 📌 Métricas sobre split temporal train/test vía `evaluate.py` con los
+> artefactos vigentes (`lgbm_daily@production v2` / `lgbm_monthly@production v1`
+> en DagsHub). El WAPE alto en MAPE refleja familias esporádicas con muchos
+> ceros; WAPE es la métrica de negocio de referencia.
 
 ### Top features más importantes
 
@@ -650,7 +649,6 @@ demand-forecast-daily@production   /   demand-forecast-monthly@production
 ### Pendientes
 | Ítem | Detalle |
 |---|---|
-| Métricas en README | Poblar tras ejecutar `evaluate.py` (guía: `docs/VALIDATION_GUIDE.md`) |
 | Secrets de CI | Configurar `MLFLOW_TRACKING_USERNAME/PASSWORD` y opcionalmente `KAGGLE_USERNAME/KEY` + repo variable `KAGGLE_DOWNLOAD_ENABLED=true` para el retraining programado |
 | Optuna | Declarado en requirements sin uso en `src/` |
 | DVC | Declarado en requirements sin uso; datos/modelos fuera de git |
