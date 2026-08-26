@@ -286,7 +286,7 @@ def run_training(horizon: int, output_suffix: str = "") -> dict:
         f"lgbm_{'daily' if horizon == 7 else 'monthly'}"
     )
 
-    with mlflow.start_run(run_name=model_name):
+    with mlflow.start_run(run_name=model_name, nested=True):
 
         # Loggear parámetros
         mlflow.log_params(params)

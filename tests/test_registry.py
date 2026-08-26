@@ -82,7 +82,7 @@ def fake_mlflow(monkeypatch, tmp_path):
     client = FakeClient()
 
     @contextmanager
-    def fake_start_run(run_name=None):
+    def fake_start_run(run_name=None, nested=False):
         yield SimpleNamespace(
             info=SimpleNamespace(run_id="run-123")
         )
@@ -132,7 +132,7 @@ class TestPromotion:
         make_fake_artifacts(tmp_path)
 
         @contextmanager
-        def failing_start_run(run_name=None):
+        def failing_start_run(run_name=None, nested=False):
             raise MlflowException("DagsHub caído")
             yield
 

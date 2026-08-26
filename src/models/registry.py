@@ -85,7 +85,8 @@ def promote_local_artifacts(
         setup_mlflow()
         with mlflow.start_run(
             run_name=f"registry_promotion_h{horizon}_"
-                     f"{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                     f"{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            nested=True
         ):
             run_id = mlflow.active_run().info.run_id
             for path in paths:
