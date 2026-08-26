@@ -98,9 +98,13 @@ def promote_local_artifacts(
                 mlflow.log_metrics(clean)
 
         client = MlflowClient()
-        version = mlflow.register_model(
-            f"runs:/{run_id}/{ARTIFACT_SUBDIR}/lgbm_h{horizon}.pkl",
-            name
+        run = client.get_run(run_id)
+        source = (
+            f"{run.info.artifact_uri}/{ARTIFACT_SUBDIR}"
+            f"/lgbm_h{horizon}.pkl"
+        )
+        version = client.create_model_version(
+            name=name, source=source, run_id=run_id
         )
         client.set_registered_model_alias(
             name, PRODUCTION_ALIAS, version.version
@@ -116,7 +120,7 @@ def promote_local_artifacts(
                 if isinstance(value, (int, float)):
                     tags[f"test_{key}"] = f"{value:.4f}"
         for tag_key, tag_value in tags.items():
-            client.set_registered_model_version_tag(
+            client.set_model_version_tag(
                 name, version.version, tag_key, tag_value
             )
 

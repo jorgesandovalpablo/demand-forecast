@@ -44,12 +44,27 @@ class FakeClient:
     def __init__(self):
         self.aliases: list[tuple] = []
         self.tags: list[tuple] = []
+        self.model_versions: list[dict] = []
         self.version_to_return = None
+
+    def get_run(self, run_id):
+        return SimpleNamespace(
+            info=SimpleNamespace(
+                run_id=run_id,
+                artifact_uri="s3://fake-bucket/exp/run-123/artifacts"
+            )
+        )
+
+    def create_model_version(self, name, source, run_id):
+        self.model_versions.append(
+            {"name": name, "source": source, "run_id": run_id}
+        )
+        return SimpleNamespace(version="3")
 
     def set_registered_model_alias(self, name, alias, version):
         self.aliases.append((name, alias, str(version)))
 
-    def set_registered_model_version_tag(self, name, version, key, value):
+    def set_model_version_tag(self, name, version, key, value):
         self.tags.append((name, version, key, value))
 
     def get_model_version_by_alias(self, name, alias):
@@ -72,13 +87,9 @@ def fake_mlflow(monkeypatch, tmp_path):
             info=SimpleNamespace(run_id="run-123")
         )
 
-    def fake_register_model(source, name):
-        return SimpleNamespace(version="3")
-
     monkeypatch.setattr(registry.mlflow, "start_run", fake_start_run)
     monkeypatch.setattr(registry.mlflow, "log_artifact", lambda *a, **k: None)
     monkeypatch.setattr(registry.mlflow, "log_metrics", lambda *a, **k: None)
-    monkeypatch.setattr(registry.mlflow, "register_model", fake_register_model)
     monkeypatch.setattr(registry.mlflow, "active_run", lambda: SimpleNamespace(
         info=SimpleNamespace(run_id="run-123")
     ))
@@ -98,6 +109,14 @@ class TestPromotion:
             7, metrics={"mae": 0.1234}, models_dir=str(tmp_path)
         )
         assert result == "demand-forecast-daily@production (v3)"
+        assert fake_mlflow.model_versions == [{
+            "name": "demand-forecast-daily",
+            "source": (
+                "s3://fake-bucket/exp/run-123/artifacts"
+                "/model/lgbm_h7.pkl"
+            ),
+            "run_id": "run-123",
+        }]
         assert (registry.get_model_name(7), PRODUCTION_ALIAS, "3") \
             in fake_mlflow.aliases
 
