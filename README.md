@@ -136,7 +136,7 @@ feature_pipeline_h7.pkl          feature_pipeline_h30.pkl
 **Pipeline de reentrenamiento automático:**
 
 ```
-Disparo manual / programado (⚠️ cron pendiente)
+Disparo manual o programado (cron semanal: lunes 06:00 UTC vía GitHub Actions)
         │
         ▼
 retrain.py
@@ -168,7 +168,7 @@ retrain.py
 | **Versionado datos** | DVC | ⚠️ Pendiente — declarado en requirements pero sin uso en src/ |
 | **Dependencias** | pip-tools | Versiones exactas y reproducibles |
 | **Calidad** | Black + Flake8 + isort | Estilo y linting automático |
-| **Tests** | pytest | 16 tests unitarios/de integración (features y API) |
+| **Tests** | pytest | 25 tests unitarios/de integración (features, API y Model Registry) |
 
 ---
 
@@ -612,7 +612,7 @@ retrain.py (promoción local exitosa)
         │
         ▼
 registry.py → log de los 3 artefactos en run dedicado
-        │      + register_model() → nueva versión
+        │      + create_model_version() → nueva versión
         ▼
 demand-forecast-daily@production   /   demand-forecast-monthly@production
 (tags: horizon, test_mae, test_wape, promoted_at)
@@ -635,10 +635,17 @@ demand-forecast-daily@production   /   demand-forecast-monthly@production
 Última actualización: 2026-08-25.
 
 ### Implementado y verificado
-- Pipeline de features stateful con paridad train/serving testada (16 tests).
+- Pipeline de features stateful con paridad train/serving testada (25 tests).
 - Promoción segura en retraining (staging → comparación → producción con backups).
 - `evaluate.py` reconstruyendo features desde el pipeline serializado.
 - Intervalos de confianza calculados en escala log desde las stats históricas completas.
+- **Validación E2E real contra DagsHub:** modelos entrenados, retraining
+  completo sin errores y registry poblado (`demand-forecast-daily@production` v2,
+  `demand-forecast-monthly@production` v1).
+- **Recuperación serving verificada:** al faltar un artefacto local,
+  `ModelRegistry.load()` lo descarga del alias `@production`.
+- Compatibilidad MLflow 3.x en la promoción (`create_model_version`) y
+  runs anidados correctos durante el retraining.
 
 ### Pendientes
 | Ítem | Detalle |
@@ -659,6 +666,17 @@ demand-forecast-daily@production   /   demand-forecast-monthly@production
 ---
 
 ## 📝 CHANGELOG
+
+### v0.2.1 (2026-08-25)
+- **Compatibilidad MLflow 3.x:** `register_model("runs:/...")` ya no
+  acepta artefactos crudos; promoción migrada a
+  `MlflowClient.create_model_version` con artifact URI directo y
+  `set_model_version_tag`.
+- **Runs anidados:** `train.py` y `registry.py` usan `start_run(nested=True)`
+  para no colisionar con el run exterior de `retrain.py`.
+- **Validación E2E completada:** entrenamiento, retraining, promoción real
+  al registry (daily v2 / monthly v1) y recuperación serving verificados.
+- Tests ampliados a 25 (features + API + Model Registry).
 
 ### v0.2.0 (2026-08-25)
 - **Pipeline de features stateful:** `DemandFeatureEngineer` con patrón
