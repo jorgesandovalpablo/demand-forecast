@@ -5,6 +5,7 @@ import mlflow
 import mlflow.lightgbm
 import joblib
 from pathlib import Path
+from typing import Optional
 from src.utils.logger import get_logger
 from src.utils.config import config
 from src.utils.seed import set_global_seed
@@ -68,7 +69,9 @@ def _train_fold(
     val_idx: pd.Index,
     feature_cols: list,
     params: dict,
-    fold_info: dict
+    fold_info: dict,
+    early_stopping_rounds: Optional[int] = None,
+    num_boost_round: Optional[int] = None,
 ) -> tuple:
     """
     Entrena el modelo en un fold y retorna
@@ -88,6 +91,15 @@ def _train_fold(
     w_train = np.ones(len(y_train))
     w_train[df.loc[train_idx, 'family'].isin(top_families)] = config['training']['weight_value']
 
+    # Resolver num_boost_round y early_stopping
+    if num_boost_round is None:
+        num_boost_round = params.get('n_estimators', 1000)
+    if early_stopping_rounds is None:
+        early_stopping_rounds = 150
+
+    # Limpiar params para lgb.train (n_estimators no es param LightGBM)
+    train_params = {k: v for k, v in params.items() if k != 'n_estimators'}
+
     # Dataset de LightGBM
     train_data = lgb.Dataset(X_train, label=y_train, weight=w_train)
     val_data   = lgb.Dataset(X_val,   label=y_val,
@@ -95,16 +107,16 @@ def _train_fold(
 
     # Callbacks
     callbacks = [
-        lgb.early_stopping(stopping_rounds=150,
+        lgb.early_stopping(stopping_rounds=early_stopping_rounds,
                            verbose=False),
         lgb.log_evaluation(period=100)
     ]
 
     # Entrenamiento
     model = lgb.train(
-        params=params,
+        params=train_params,
         train_set=train_data,
-        num_boost_round=params.get('n_estimators', 1000),
+        num_boost_round=num_boost_round,
         valid_sets=[train_data, val_data],
         valid_names=['train', 'val'],
         callbacks=callbacks

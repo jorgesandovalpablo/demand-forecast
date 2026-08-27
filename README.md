@@ -164,7 +164,7 @@ retrain.py
 | **Validación** | Pydantic v2 | Schemas de entrada/salida |
 | **Container** | Docker + docker-compose | Deployment reproducible |
 | **CI** | GitHub Actions | Tests automáticos en cada push |
-| **Optimización** | Optuna | ⚠️ Pendiente — declarado en requirements pero sin uso en src/ |
+| **Optimización** | Optuna | ✅ Integrado — `src/models/tune.py` con CLI `--horizon`, `--trials`, `--timeout` |
 | **Versionado datos** | DVC | ⚠️ Pendiente — declarado en requirements pero sin uso en src/ |
 | **Dependencias** | pip-tools | Versiones exactas y reproducibles |
 | **Calidad** | Black + Flake8 + isort | Estilo y linting automático |
@@ -650,7 +650,7 @@ demand-forecast-daily@production   /   demand-forecast-monthly@production
 | Ítem | Detalle |
 |---|---|
 | Secrets de CI | Configurar `MLFLOW_TRACKING_USERNAME/PASSWORD` y opcionalmente `KAGGLE_USERNAME/KEY` + repo variable `KAGGLE_DOWNLOAD_ENABLED=true` para el retraining programado |
-| Optuna | Declarado en requirements sin uso en `src/` |
+| Optuna | Integrado en `src/models/tune.py` — ejecutar `python -m src.models.tune --horizon 7 --trials 50` |
 | DVC | Declarado en requirements sin uso; datos/modelos fuera de git |
 | SHAP | Migrado a `src/models/shap_analysis.py`; flag `--shap` en `evaluate.py` |
 
@@ -661,6 +661,16 @@ demand-forecast-daily@production   /   demand-forecast-monthly@production
 ---
 
 ## 📝 CHANGELOG
+
+### v0.4.1 (2026-08-27)
+- **Optuna tuning:** nuevo `src/models/tune.py` con búsqueda
+  de hiperparámetros LightGBM vía Optuna (HyperbandPruner).
+  Estrategia conservadora: subsampleo 15%, 3 folds, 400 rounds,
+  early stopping 50 → ~8-12 min/trial, viable en laptop sin GPU.
+- `_train_fold`: parámetros opcionales `early_stopping_rounds`
+  y `num_boost_round` (backward-compatible).
+- Config: sección `optuna:` con ranges de búsqueda y defaults.
+- Tests: 39 → 54 (15 nuevos en `test_tune.py`).
 
 ### v0.4.0 (2026-08-26)
 - **SHAP refresh:** nuevo `src/models/shap_analysis.py` como
