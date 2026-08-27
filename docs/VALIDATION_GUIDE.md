@@ -14,7 +14,7 @@ Requisitos previos:
 ## Paso 0 — Tests y linting (sin datos)
 
 ```bash
-pytest tests/ -v --tb=short          # 25 tests esperados en verde
+pytest tests/ -v --tb=short          # 32 tests esperados en verde
 flake8 --select=F src/ tests/        # sin salida = limpio
 ```
 
