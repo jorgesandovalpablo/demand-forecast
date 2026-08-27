@@ -24,6 +24,7 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
+          pip install -e .
 
       - name: Lint (flake8 errores fatales)
         run: flake8 --select=F src/ tests/
