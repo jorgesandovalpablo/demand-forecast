@@ -168,7 +168,7 @@ retrain.py
 | **Versionado datos** | DVC | ⚠️ Pendiente — declarado en requirements pero sin uso en src/ |
 | **Dependencias** | pip-tools | Versiones exactas y reproducibles |
 | **Calidad** | Black + Flake8 + isort | Estilo y linting automático |
-| **Tests** | pytest | 25 tests unitarios/de integración (features, API y Model Registry) |
+| **Tests** | pytest | 26 tests unitarios/de integración (features, API y Model Registry) |
 
 ---
 
@@ -655,15 +655,18 @@ demand-forecast-daily@production   /   demand-forecast-monthly@production
 | SHAP | Import comentado en `evaluate.py`; reports/shap son de versiones anteriores |
 
 ### Limitaciones conocidas (deuda técnica aceptada)
-- **OOM potencial en la API:** `main.py` carga el histórico completo
-  (`train_processed.parquet`) en RAM. Válido como portafolio; en producción
-  real requeriría una tienda de features externa (Redis/DB).
 - **Inferencia por recálculo:** cada `/predict` reconstruye lags sobre el
   historial concatenado; no hay cache incremental de features.
 
 ---
 
 ## 📝 CHANGELOG
+
+### v0.2.2 (2026-08-26)
+- **OOM API mitigado:** lifespan carga el parquet recortado a
+  `config['lags']['max_lag']` (365 días), reduciendo RAM ~75%.
+  Misma constante que `predict.py` (regla de paridad).
+- Tests: 25 → 26 (nuevo `TestLifespanCutoff`).
 
 ### v0.2.1 (2026-08-25)
 - **Compatibilidad MLflow 3.x:** `register_model("runs:/...")` ya no
@@ -674,7 +677,7 @@ demand-forecast-daily@production   /   demand-forecast-monthly@production
   para no colisionar con el run exterior de `retrain.py`.
 - **Validación E2E completada:** entrenamiento, retraining, promoción real
   al registry (daily v2 / monthly v1) y recuperación serving verificados.
-- Tests ampliados a 25 (features + API + Model Registry).
+- Tests ampliados a 26 (features + API + Model Registry + lifespan cutoff).
 
 ### v0.2.0 (2026-08-25)
 - **Pipeline de features stateful:** `DemandFeatureEngineer` con patrón

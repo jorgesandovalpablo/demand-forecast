@@ -45,17 +45,22 @@ async def lifespan(app: FastAPI):
     """
     logger.info("Iniciando API...")
 
-    # Cargar datos históricos
+    # Cargar datos históricos (recortados a max_lag días)
     data_path = Path(
         "data/processed/train_processed.parquet"
     )
     if data_path.exists():
-        app_state['historical_df'] = pd.read_parquet(
-            data_path
-        )
+        full_df = pd.read_parquet(data_path)
+        max_history = config['lags']['max_lag']
+        last_date = full_df['date'].max()
+        cutoff = last_date - pd.Timedelta(days=max_history)
+        app_state['historical_df'] = full_df[
+            full_df['date'] >= cutoff
+        ].copy()
         logger.info(
-            f"Datos históricos cargados: "
-            f"{app_state['historical_df'].shape}"
+            f"Histórico: {len(full_df)} filas → "
+            f"{len(app_state['historical_df'])} filas "
+            f"(últimos {max_history} días)"
         )
     else:
         logger.warning(

@@ -12,6 +12,7 @@ El lifespan no se ejecuta: los artefactos reales nunca se cargan.
 import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
+from unittest.mock import MagicMock
 
 from src.api.main import app, app_state
 
@@ -125,3 +126,56 @@ class TestPredict:
             json={"store_nbr": 3, "horizon": 7},
         )
         assert resp.status_code == 400
+
+
+class TestLifespanCutoff:
+    """El lifespan recorta el histórico a max_lag días para evitar OOM."""
+
+    def test_lifespan_applies_temporal_cutoff(self, monkeypatch):
+        """El parquet de ~730 días se reduce a ~365 tras el lifespan."""
+        import asyncio
+        from src.api.main import lifespan
+
+        dates = pd.date_range("2015-01-01", "2017-08-15", freq="D")
+        full_df = pd.DataFrame({
+            "date": dates,
+            "store_nbr": 1,
+            "family": 1,
+            "sales": 10.0,
+        })
+
+        saved = {
+            "historical_df": app_state["historical_df"],
+            "models_loaded": list(app_state["models_loaded"]),
+        }
+
+        try:
+            mock_path_instance = MagicMock()
+            mock_path_instance.exists.return_value = True
+            monkeypatch.setattr(
+                "src.api.main.Path", lambda x: mock_path_instance
+            )
+            monkeypatch.setattr(
+                "src.api.main.pd.read_parquet", lambda p: full_df
+            )
+            monkeypatch.setattr(
+                "src.api.main.ModelRegistry", MagicMock()
+            )
+
+            mock_app = MagicMock()
+
+            async def run_lifespan():
+                async with lifespan(mock_app):
+                    pass
+
+            asyncio.run(run_lifespan())
+
+            result = app_state["historical_df"]
+            assert result is not None
+            assert len(result) < len(full_df)
+            assert result["date"].min() >= (
+                full_df["date"].max() - pd.Timedelta(days=365)
+            )
+        finally:
+            app_state["historical_df"] = saved["historical_df"]
+            app_state["models_loaded"] = saved["models_loaded"]
