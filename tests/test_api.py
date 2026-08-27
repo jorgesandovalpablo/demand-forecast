@@ -201,6 +201,19 @@ class TestPredict:
         assert resp.status_code == 400
         assert "no encontrada" in resp.json()["detail"]
 
+    def test_family_filter_invalid_int_code_returns_400(self, client, monkeypatch):
+        """Código entero inexistente retorna 400 con lista de válidos."""
+        monkeypatch.setattr(
+            "src.api.main.predict_by_store",
+            lambda historical_df, horizon, store_nbr: mock_predictions(),
+        )
+        resp = client.post(
+            "/predict",
+            json={"store_nbr": 1, "horizon": 7, "family": 999},
+        )
+        assert resp.status_code == 400
+        assert "no encontrado" in resp.json()["detail"]
+
     def test_family_filter_by_int_code_still_works(self, client, monkeypatch):
         """El filtro por código entero sigue funcionando (backward compat)."""
         monkeypatch.setattr(

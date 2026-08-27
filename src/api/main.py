@@ -287,6 +287,16 @@ async def get_predictions(request: PredictionRequest):
                         status_code=400, detail=str(e)
                     )
             else:
+                if request.family not in fmap:
+                    valid = sorted(fmap.values())
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"Código de familia "
+                            f"{request.family} no encontrado. "
+                            f"Válidas: {valid}"
+                        )
+                    )
                 family_code = request.family
 
             predictions = predictions[
