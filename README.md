@@ -6,7 +6,7 @@
 > FastAPI deployment y retraining con promoción segura (cron semanal vía GitHub Actions).
 
 ![CI](https://github.com/jorgesandovalpablo/demand-forecast/actions/workflows/ci.yml/badge.svg)
-![Python](https://img.shields.io/badge/python-3.10-blue)
+![Python](https://img.shields.io/badge/python-3.13-blue)
 ![LightGBM](https://img.shields.io/badge/model-LightGBM-green)
 ![FastAPI](https://img.shields.io/badge/api-FastAPI-teal)
 ![MLflow](https://img.shields.io/badge/tracking-MLflow-orange)
