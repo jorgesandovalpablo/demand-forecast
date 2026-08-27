@@ -77,19 +77,19 @@ secrets), @tarquinen/opencode-dcp (poda de contexto), opencode-notify
 
 ## Roadmap Fase 3 (acordado, no iniciado)
 
-| # | Ítem | Detalle |
+| # | Ítem | Estado |
 |---|---|---|
-| 1 | OOM API mitigación | Cutoff temporal en lifespan usando `config['lags']['max_lag']` compartido con `predict.py` (deuda B) |
-| 2 | Contrato API family por nombre | `schemas.py` acepta `str`, traducción nombre↔código vía `pipeline.categories_mapping` |
-| 3 | SHAP refresh | Reescribir `shap_analysis.py` (raíz obsoleto) migrando a `src/` vía `ModelRegistry.load()` |
-| 4 | Optuna | Tuning de hiperparámetros por horizonte con walk-forward como backend (`src/models/tune.py` nuevo, diseño con subsampleo) |
+| 1 | OOM API mitigación | ✅ RESUELTO: cutoff temporal en lifespan, 365d, RAM ~75% menos (`84d4247`) |
+| 2 | Contrato API family por nombre | ✅ RESUELTO: `Union[int, str]` en request, str en response, mapeo dinámico (`16fe2a6`) |
+| 3 | SHAP refresh | ✅ RESUELTO: `src/models/shap_analysis.py` CLI limpio, integrado en `evaluate.py --shap` (`5dcdfbd`) |
+| 4 | Optuna | Pendiente: `src/models/tune.py` nuevo, diseño con subsampleo |
 
 ## Gotchas técnicos relevantes para futuros agentes
 
 - El parquet intermedio `train_features_d*.parquet` YA NO existe:
   features se reconstruyen siempre vía pipeline serializado.
-- `family` está codificado como int16 post-transform; el contrato API
-  espera códigos enteros (ver categories_mapping del pipeline).
+- `family` se codifica como int16 post-transform; la API acepta
+  `Union[int, str]` y retorna nombre legible (ver `categories_mapping`).
 - `merge()` dentro de transform() resetea el índice del DataFrame:
   no confiar en alineación posicional contra el df original.
 - Los entrenamientos toman ~2h por horizonte en la máquina del usuario;

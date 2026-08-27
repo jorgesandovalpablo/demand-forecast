@@ -52,4 +52,4 @@ Se partió del estado dejado por el agente anterior (`resume.md`): refactor a `D
   uvicorn src.api.main:app --port 8000
   ```
 - No requiere reentrenar: artefactos del 23/08 son compatibles.
-- Deuda restante (documentada en PROJECT_KNOWLEDGE.md §B): OOM potencial en API, `mlruns/` versionado en git, `lambda_l1` duplicado en `config.yaml` (params_lgbm_mensual), métricas vacías en README.
+- Deuda restante (documentada en PROJECT_KNOWLEDGE.md §E): Optuna y DVC sin uso en `src/`; secrets de CI por configurar. OOM API mitigado (Fase 3 Ítem 1).

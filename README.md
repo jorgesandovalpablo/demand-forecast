@@ -631,10 +631,10 @@ demand-forecast-daily@production   /   demand-forecast-monthly@production
 
 ## ⚠️ Estado actual y limitaciones
 
-Última actualización: 2026-08-25.
+Última actualización: 2026-08-26.
 
 ### Implementado y verificado
-- Pipeline de features stateful con paridad train/serving testada (25 tests).
+- Pipeline de features stateful con paridad train/serving testada (39 tests).
 - Promoción segura en retraining (staging → comparación → producción con backups).
 - `evaluate.py` reconstruyendo features desde el pipeline serializado.
 - Intervalos de confianza calculados en escala log desde las stats históricas completas.
@@ -652,7 +652,7 @@ demand-forecast-daily@production   /   demand-forecast-monthly@production
 | Secrets de CI | Configurar `MLFLOW_TRACKING_USERNAME/PASSWORD` y opcionalmente `KAGGLE_USERNAME/KEY` + repo variable `KAGGLE_DOWNLOAD_ENABLED=true` para el retraining programado |
 | Optuna | Declarado en requirements sin uso en `src/` |
 | DVC | Declarado en requirements sin uso; datos/modelos fuera de git |
-| SHAP | Import comentado en `evaluate.py`; reports/shap son de versiones anteriores |
+| SHAP | Migrado a `src/models/shap_analysis.py`; flag `--shap` en `evaluate.py` |
 
 ### Limitaciones conocidas (deuda técnica aceptada)
 - **Inferencia por recálculo:** cada `/predict` reconstruye lags sobre el
