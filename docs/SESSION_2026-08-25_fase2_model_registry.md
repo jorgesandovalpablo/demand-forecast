@@ -82,7 +82,7 @@ secrets), @tarquinen/opencode-dcp (poda de contexto), opencode-notify
 | 1 | OOM API mitigación | ✅ RESUELTO: cutoff temporal en lifespan, 365d, RAM ~75% menos (`84d4247`) |
 | 2 | Contrato API family por nombre | ✅ RESUELTO: `Union[int, str]` en request, str en response, mapeo dinámico (`16fe2a6`) |
 | 3 | SHAP refresh | ✅ RESUELTO: `src/models/shap_analysis.py` CLI limpio, integrado en `evaluate.py --shap` (`5dcdfbd`) |
-| 4 | Optuna | Pendiente: `src/models/tune.py` nuevo, diseño con subsampleo |
+| 4 | Optuna | ✅ RESUELTO: `src/models/tune.py` CLI con Optuna, subsampleo 15%, 3 folds, 400 rounds (`bb69def`) |
 
 ## Gotchas técnicos relevantes para futuros agentes
 
