@@ -1,4 +1,5 @@
 # src/api/main.py
+import joblib
 import pandas as pd
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -29,7 +30,9 @@ logger = get_logger(__name__)
 # ─────────────────────────────────────────
 app_state = {
     'historical_df': None,
-    'models_loaded': []
+    'models_loaded': [],
+    'family_map': {},
+    'family_map_r': {}
 }
 
 
@@ -68,6 +71,28 @@ async def lifespan(app: FastAPI):
             "Ejecuta primero el pipeline de preprocessing."
         )
 
+    # Cargar mapping family code↔name desde el pipeline serializado
+    for horizon in [7, 30]:
+        pipeline_path = Path(
+            f"models/feature_pipeline_h{horizon}.pkl"
+        )
+        if pipeline_path.exists():
+            pipeline = joblib.load(pipeline_path)
+            if 'family' in pipeline.categories_mapping:
+                cats = pipeline.categories_mapping['family']
+                app_state['family_map'] = {
+                    i: str(name) for i, name in enumerate(cats)
+                }
+                app_state['family_map_r'] = {
+                    str(name).upper(): i
+                    for i, name in enumerate(cats)
+                }
+                logger.info(
+                    f"Family mapping cargado: "
+                    f"{len(app_state['family_map'])} familias"
+                )
+                break
+
     # Pre-cargar modelos en memoria
     for horizon in [7, 30]:
         model_path = Path(f"models/lgbm_h{horizon}.pkl")
@@ -87,6 +112,39 @@ async def lifespan(app: FastAPI):
     logger.info("Apagando API...")
     ModelRegistry.clear_cache()
     logger.info("API apagada")
+
+
+# ─────────────────────────────────────────
+# Helpers: family code ↔ name
+# ─────────────────────────────────────────
+def resolve_family_name_to_code(
+    name: str,
+    mapping: dict[int, str]
+) -> int:
+    """
+    Resuelve nombre de familia a código entero.
+    Case-insensitive. Lanza ValueError si no existe.
+    """
+    key = name.strip().upper()
+    for code, full_name in mapping.items():
+        if full_name.upper() == key:
+            return code
+    valid = sorted(mapping.values())
+    raise ValueError(
+        f"Familia '{name}' no encontrada. "
+        f"Válidas: {valid}"
+    )
+
+
+def resolve_family_code_to_name(
+    code: int,
+    mapping: dict[int, str]
+) -> str:
+    """
+    Resuelve código entero a nombre de familia.
+    Retorna str(code) como fallback si no encontrado.
+    """
+    return mapping.get(code, str(code))
 
 
 # ─────────────────────────────────────────
@@ -216,26 +274,46 @@ async def get_predictions(request: PredictionRequest):
         )
 
         # Filtrar por familia si se especificó
-        if request.family:
+        family_code = None
+        if request.family is not None:
+            fmap = app_state['family_map']
+            if isinstance(request.family, str):
+                try:
+                    family_code = resolve_family_name_to_code(
+                        request.family, fmap
+                    )
+                except ValueError as e:
+                    raise HTTPException(
+                        status_code=400, detail=str(e)
+                    )
+            else:
+                family_code = request.family
+
             predictions = predictions[
-                predictions['family'] == request.family
+                predictions['family'] == family_code
             ]
             if predictions.empty:
+                display = resolve_family_code_to_name(
+                    family_code, fmap
+                )
                 raise HTTPException(
                     status_code=404,
                     detail=(
-                        f"Familia '{request.family}' "
+                        f"Familia '{display}' "
                         f"no encontrada para tienda "
                         f"{request.store_nbr}"
                     )
                 )
 
         # Convertir a lista de PredictionItem
+        fmap = app_state['family_map']
         items = [
             PredictionItem(
                 date=row['date'],
                 store_nbr=row['store_nbr'],
-                family=row['family'],
+                family=resolve_family_code_to_name(
+                    int(row['family']), fmap
+                ),
                 predicted_sales=row['predicted_sales'],
                 lower_bound=row['lower_bound'],
                 upper_bound=row['upper_bound']

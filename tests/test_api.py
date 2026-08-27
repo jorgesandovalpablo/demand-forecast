@@ -22,6 +22,38 @@ def client(monkeypatch) -> TestClient:
     """Cliente con estado simulado: datos disponibles y modelo h7 cargado."""
     monkeypatch.setitem(app_state, "historical_df", pd.DataFrame())
     monkeypatch.setitem(app_state, "models_loaded", [7])
+    monkeypatch.setitem(app_state, "family_map", {
+        0: "AUTOMOTIVE", 1: "BABY CARE", 2: "BEAUTY",
+        3: "BEVERAGES", 4: "BOOKS", 5: "BREAD/BAKERY",
+        6: "CELEBRATION", 7: "CLEANING", 8: "DAIRY",
+        9: "DELI", 10: "EGGS", 11: "FROZEN FOODS",
+        12: "GROCERY I", 13: "GROCERY II", 14: "HARDWARE",
+        15: "HOME AND KITCHEN I", 16: "HOME AND KITCHEN II",
+        17: "HOMEAPPLIANCES", 18: "HOME CARE", 19: "LADIESWEAR",
+        20: "LAWN AND GARDEN", 21: "LINGERIE",
+        22: "LIQUOR,WINE,BEER", 23: "MAGAZINES",
+        24: "MEATS", 25: "PERSONAL CARE", 26: "PET SUPPLIES",
+        27: "PLAYERS AND ELECTRONICS", 28: "POULTRY",
+        29: "PREPARED FOODS", 30: "PRODUCE",
+        31: "SCHOOL AND OFFICE SUPPLIES", 32: "SEAFOOD",
+    })
+    monkeypatch.setitem(app_state, "family_map_r", {
+        v.upper(): k for k, v in {
+            0: "AUTOMOTIVE", 1: "BABY CARE", 2: "BEAUTY",
+            3: "BEVERAGES", 4: "BOOKS", 5: "BREAD/BAKERY",
+            6: "CELEBRATION", 7: "CLEANING", 8: "DAIRY",
+            9: "DELI", 10: "EGGS", 11: "FROZEN FOODS",
+            12: "GROCERY I", 13: "GROCERY II", 14: "HARDWARE",
+            15: "HOME AND KITCHEN I", 16: "HOME AND KITCHEN II",
+            17: "HOMEAPPLIANCES", 18: "HOME CARE", 19: "LADIESWEAR",
+            20: "LAWN AND GARDEN", 21: "LINGERIE",
+            22: "LIQUOR,WINE,BEER", 23: "MAGAZINES",
+            24: "MEATS", 25: "PERSONAL CARE", 26: "PET SUPPLIES",
+            27: "PLAYERS AND ELECTRONICS", 28: "POULTRY",
+            29: "PREPARED FOODS", 30: "PRODUCE",
+            31: "SCHOOL AND OFFICE SUPPLIES", 32: "SEAFOOD",
+        }.items()
+    })
     return TestClient(app)
 
 
@@ -127,6 +159,76 @@ class TestPredict:
         )
         assert resp.status_code == 400
 
+    def test_family_filter_by_name_ok(self, client, monkeypatch):
+        """Filtrar por nombre de familia (str) retorna solo esa familia."""
+        monkeypatch.setattr(
+            "src.api.main.predict_by_store",
+            lambda historical_df, horizon, store_nbr: mock_predictions(),
+        )
+        resp = client.post(
+            "/predict",
+            json={"store_nbr": 1, "horizon": 7, "family": "BEVERAGES"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["n_predictions"] == 2
+        assert body["predictions"][0]["family"] == "BEVERAGES"
+
+    def test_family_filter_by_name_case_insensitive(self, client, monkeypatch):
+        """El filtro por nombre es case-insensitive."""
+        monkeypatch.setattr(
+            "src.api.main.predict_by_store",
+            lambda historical_df, horizon, store_nbr: mock_predictions(),
+        )
+        resp = client.post(
+            "/predict",
+            json={"store_nbr": 1, "horizon": 7, "family": "beverages"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["predictions"][0]["family"] == "BEVERAGES"
+
+    def test_family_filter_invalid_name_returns_400(self, client, monkeypatch):
+        """Nombre de familia inexistente retorna 400 con lista de válidas."""
+        monkeypatch.setattr(
+            "src.api.main.predict_by_store",
+            lambda historical_df, horizon, store_nbr: mock_predictions(),
+        )
+        resp = client.post(
+            "/predict",
+            json={"store_nbr": 1, "horizon": 7, "family": "NOEXISTE"},
+        )
+        assert resp.status_code == 400
+        assert "no encontrada" in resp.json()["detail"]
+
+    def test_family_filter_by_int_code_still_works(self, client, monkeypatch):
+        """El filtro por código entero sigue funcionando (backward compat)."""
+        monkeypatch.setattr(
+            "src.api.main.predict_by_store",
+            lambda historical_df, horizon, store_nbr: mock_predictions(),
+        )
+        resp = client.post(
+            "/predict",
+            json={"store_nbr": 1, "horizon": 7, "family": 3},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["predictions"][0]["family"] == "BEVERAGES"
+
+    def test_response_family_is_string_not_int(self, client, monkeypatch):
+        """El campo family en la respuesta es string, no entero."""
+        monkeypatch.setattr(
+            "src.api.main.predict_by_store",
+            lambda historical_df, horizon, store_nbr: mock_predictions(),
+        )
+        resp = client.post(
+            "/predict",
+            json={"store_nbr": 1, "horizon": 7},
+        )
+        assert resp.status_code == 200
+        for pred in resp.json()["predictions"]:
+            assert isinstance(pred["family"], str)
+
 
 class TestLifespanCutoff:
     """El lifespan recorta el histórico a max_lag días para evitar OOM."""
@@ -160,6 +262,10 @@ class TestLifespanCutoff:
             )
             monkeypatch.setattr(
                 "src.api.main.ModelRegistry", MagicMock()
+            )
+            # Mock joblib.load para evitar unpickle del pipeline real
+            monkeypatch.setattr(
+                "src.api.main.joblib.load", lambda p: MagicMock()
             )
 
             mock_app = MagicMock()

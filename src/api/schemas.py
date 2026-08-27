@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, validator
-from typing import Optional
+from typing import Optional, Union
 from datetime import date
 
 
@@ -20,11 +20,13 @@ class PredictionRequest(BaseModel):
         ...,
         description="Horizonte de predicción: 7 (diario) o 30 (mensual)"
     )
-    family: Optional[int] = Field(
+    family: Optional[Union[int, str]] = Field(
         default=None,
-        ge=0,
-        le=33,
-        description="Familia de producto. Si es None retorna todas."
+        description=(
+            "Familia de producto: entero (0-33) o nombre "
+            "(ej. 'BEVERAGES', case-insensitive). "
+            "Si es None retorna todas."
+        )
     )
 
     @validator('horizon')
@@ -40,7 +42,7 @@ class PredictionRequest(BaseModel):
             "example": {
                 "store_nbr": 1,
                 "horizon":   7,
-                "family":  11
+                "family":  "BEVERAGES"
             }
         }
 
@@ -77,7 +79,7 @@ class PredictionItem(BaseModel):
     """
     date:            date
     store_nbr:       int
-    family:          int
+    family:          str
     predicted_sales: float
     lower_bound:     float
     upper_bound:     float
@@ -102,7 +104,7 @@ class PredictionResponse(BaseModel):
                     {
                         "date":            "2024-01-16",
                         "store_nbr":       1,
-                        "family":          3,
+                        "family":          "BEVERAGES",
                         "predicted_sales": 245.30,
                         "lower_bound":     198.20,
                         "upper_bound":     292.40

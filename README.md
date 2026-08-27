@@ -168,7 +168,7 @@ retrain.py
 | **Versionado datos** | DVC | ⚠️ Pendiente — declarado en requirements pero sin uso en src/ |
 | **Dependencias** | pip-tools | Versiones exactas y reproducibles |
 | **Calidad** | Black + Flake8 + isort | Estilo y linting automático |
-| **Tests** | pytest | 26 tests unitarios/de integración (features, API y Model Registry) |
+| **Tests** | pytest | 31 tests unitarios/de integración (features, API y Model Registry) |
 
 ---
 
@@ -661,6 +661,14 @@ demand-forecast-daily@production   /   demand-forecast-monthly@production
 ---
 
 ## 📝 CHANGELOG
+
+### v0.3.0 (2026-08-26)
+- **Family por nombre:** `/predict` acepta `"family": "BEVERAGES"`
+  además de `"family": 3`. Case-insensitive. Respuesta retorna
+  nombre legible en vez de código entero.
+- Mapeo cargado desde `feature_pipeline_h{h}.pkl` al iniciar la API.
+- Tests: 26 → 31 (5 nuevos: name filter, case-insensitive,
+  invalid name, backward compat int, response type).
 
 ### v0.2.2 (2026-08-26)
 - **OOM API mitigado:** lifespan carga el parquet recortado a
