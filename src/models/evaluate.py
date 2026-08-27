@@ -398,7 +398,7 @@ def plot_errors_by_family(
 # ─────────────────────────────────────────
 # Función principal — punto de entrada
 # ─────────────────────────────────────────
-def run_evaluation(horizon: int) -> dict:
+def run_evaluation(horizon: int, run_shap: bool = False) -> dict:
     """
     Ejecuta la evaluación completa del modelo
     sobre el test set.
@@ -406,6 +406,7 @@ def run_evaluation(horizon: int) -> dict:
     Parámetros:
         horizon: 7 → modelo diario
                  30 → modelo mensual
+        run_shap: si True, ejecuta análisis SHAP adicional
 
     Retorna:
         dict con todas las métricas y análisis
@@ -532,13 +533,22 @@ def run_evaluation(horizon: int) -> dict:
     logger.info(" Evaluación completada")
     logger.info("=" * 50)
 
-    return {
+    results = {
         'global_metrics': global_metrics,
         'family_metrics': family_metrics,
         'store_metrics':  store_metrics,
         'time_metrics':   time_metrics,
         'importance':     importance
     }
+
+    # SHAP analysis (opcional)
+    if run_shap:
+        from src.models.shap_analysis import run_shap_analysis
+        logger.info("Ejecutando análisis SHAP...")
+        shap_df = run_shap_analysis(horizon=horizon)
+        results['shap'] = shap_df
+
+    return results
 
 
 # ─────────────────────────────────────────
@@ -555,6 +565,12 @@ if __name__ == "__main__":
         required=True,
         help='Horizonte: 7 (diario) o 30 (mensual)'
     )
+    parser.add_argument(
+        '--shap',
+        action='store_true',
+        default=False,
+        help='Ejecutar análisis SHAP adicional'
+    )
     args = parser.parse_args()
 
-    run_evaluation(horizon=args.horizon)
+    run_evaluation(horizon=args.horizon, run_shap=args.shap)

@@ -230,7 +230,6 @@ logs/
 #aux scrits while coding
 /test_*.py
 notebook*.ipynb
-shap*.py
 
 #auxiliar test  
 test_build_festures.py

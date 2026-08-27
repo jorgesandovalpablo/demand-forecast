@@ -168,7 +168,7 @@ retrain.py
 | **Versionado datos** | DVC | ⚠️ Pendiente — declarado en requirements pero sin uso en src/ |
 | **Dependencias** | pip-tools | Versiones exactas y reproducibles |
 | **Calidad** | Black + Flake8 + isort | Estilo y linting automático |
-| **Tests** | pytest | 31 tests unitarios/de integración (features, API y Model Registry) |
+| **Tests** | pytest | 39 tests unitarios/de integración (features, API, Model Registry y SHAP) |
 
 ---
 
@@ -661,6 +661,14 @@ demand-forecast-daily@production   /   demand-forecast-monthly@production
 ---
 
 ## 📝 CHANGELOG
+
+### v0.4.0 (2026-08-26)
+- **SHAP refresh:** nuevo `src/models/shap_analysis.py` como
+  script CLI limpio (`--horizon`, `--sample`, `--output-dir`).
+  Usa `ModelRegistry.load()`, pipeline serializado, logger,
+  type hints. Eliminado `shap_analysis.py` obsoleto de raíz.
+- Integrado en `evaluate.py` con flag `--shap`.
+- Tests: 32 → 39 (7 nuevos: classify, compute shap, subsample).
 
 ### v0.3.0 (2026-08-26)
 - **Family por nombre:** `/predict` acepta `"family": "BEVERAGES"`
