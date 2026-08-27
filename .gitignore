@@ -222,7 +222,7 @@ __pychcahe__/
 data/raw/
 data/processed/
 data/predictions/
-notebooks/figures/
+notebooks/figures/*_store*.png
 
 #logs 
 logs/

@@ -25,6 +25,7 @@
 - [Reproducir el proyecto](#-reproducir-el-proyecto)
 - [API](#-api)
 - [Decisiones de diseño](#-decisiones-de-diseño)
+- [Interpretabilidad (SHAP)](#-interpretabilidad-shap)
 - [Hallazgos del EDA](#-hallazgos-del-eda)
 - [Autor](#-autor)
 
@@ -132,6 +133,13 @@ feature_pipeline_h7.pkl          feature_pipeline_h30.pkl
 > junto al modelo; serving y evaluación reconstruyen features con
 > `.transform()` sobre ese estado congelado.
 
+<p align="center">
+  <img src="notebooks/figures/cv_folds_h7.png" width="45%" alt="CV Folds h7" />
+  &nbsp;&nbsp;
+  <img src="notebooks/figures/cv_folds_h30.png" width="45%" alt="CV Folds h30" />
+</p>
+<p align="center"><em>Walk-forward CV: 5 folds con ventana de validación de 4 semanas cada uno</em></p>
+
 
 **Pipeline de reentrenamiento automático:**
 
@@ -199,6 +207,13 @@ retrain.py
 > en DagsHub). El WAPE alto en MAPE refleja familias esporádicas con muchos
 > ceros; WAPE es la métrica de negocio de referencia.
 
+<p align="center">
+  <img src="notebooks/figures/predictions_h7.png" width="45%" alt="Predicciones h7" />
+  &nbsp;&nbsp;
+  <img src="notebooks/figures/predictions_h30.png" width="45%" alt="Predicciones h30" />
+</p>
+<p align="center"><em>Predicciones vs valores reales — conjunto de test (8 semanas)</em></p>
+
 ### Top features más importantes
 
 | Rank | Feature | Grupo |
@@ -208,6 +223,13 @@ retrain.py
 | 3 | transactions | Externo |
 | 4 | lag_14 / lag_60 | Lags |
 | 5 | dcoilwtico | Externo |
+
+<p align="center">
+  <img src="notebooks/figures/feature_importance_h7.png" width="45%" alt="Feature importance h7" />
+  &nbsp;&nbsp;
+  <img src="notebooks/figures/feature_importance_h30.png" width="45%" alt="Feature importance h30" />
+</p>
+<p align="center"><em>Top 20 features por gain — modelo diario (izq.) y mensual (der.)</em></p>
 
 ### Familias con mayor error (baseline)
 
@@ -220,6 +242,13 @@ Las familias con alto porcentaje de ceros presentan mayor error:
 | SCHOOL/OFFICE | 74% | Modelo global + flag esporádica |
 | GROCERY I | 8% | Modelo global — alta precisión |
 | BEVERAGES | 8% | Modelo global — alta precisión |
+
+<p align="center">
+  <img src="notebooks/figures/errors_by_family_h7.png" width="45%" alt="Errores por familia h7" />
+  &nbsp;&nbsp;
+  <img src="notebooks/figures/errors_by_family_h30.png" width="45%" alt="Errores por familia h30" />
+</p>
+<p align="center"><em>MAE por familia — picos en series esporádicas con >70% ceros</em></p>
 
 ---
 
@@ -262,9 +291,11 @@ demand-forecast/
 │   ├── models/
 │   │   ├── validation.py      # Walk-forward cross validation + métricas
 │   │   ├── train.py           # LightGBM + MLflow + pipeline a staging
-│   │   ├── evaluate.py        # Métricas y análisis de errores
+│   │   ├── evaluate.py        # Métricas, análisis de errores y SHAP
 │   │   ├── predict.py         # Inferencia + ModelRegistry con caché
-│   │   └── retrain.py         # Promoción segura: staging → comparación → producción
+│   │   ├── retrain.py         # Promoción segura: staging → comparación → producción
+│   │   ├── tune.py            # Optuna hyperparameter tuning
+│   │   └── shap_analysis.py   # SHAP explainability
 │   ├── api/
 │   │   ├── main.py            # FastAPI endpoints
 │   │   └── schemas.py         # Pydantic validation
@@ -275,7 +306,10 @@ demand-forecast/
 │
 ├── tests/
 │   ├── test_features.py       # Paridad train/serving del feature engineering
-│   └── test_api.py            # Contrato HTTP de la API (mockeado)
+│   ├── test_api.py            # Contrato HTTP de la API (mockeado)
+│   ├── test_registry.py       # MLflow Model Registry
+│   ├── test_shap.py           # SHAP analysis
+│   └── test_tune.py           # Optuna tuning
 │
 ├── logs/                      # Logs operacionales (no versionados)
 ├── .env.example               # Variables de entorno de ejemplo
@@ -629,6 +663,21 @@ demand-forecast-daily@production   /   demand-forecast-monthly@production
 
 ---
 
+## 🔍 Interpretabilidad (SHAP)
+
+Análisis SHAP integrado en `evaluate.py` con el flag `--shap`.
+Clasifica features en KEEP / DROP_CANDIDATE basándose en la
+contribución media absoluta a las predicciones.
+
+<p align="center">
+  <img src="reports/shap/shap_top30_h7.png" width="45%" alt="SHAP h7" />
+  &nbsp;&nbsp;
+  <img src="reports/shap/shap_top30_h30.png" width="45%" alt="SHAP h30" />
+</p>
+<p align="center"><em>Top 30 features por impacto SHAP — diario (izq.) y mensual (der.)</em></p>
+
+---
+
 ## ⚠️ Estado actual y limitaciones
 
 Última actualización: 2026-08-27.
@@ -734,8 +783,16 @@ demand-forecast-daily@production   /   demand-forecast-monthly@production
 
 ## 👤 Autor
 
-**Jorge Sandoval**
+**Jorge Sandoval** — ML Engineer
+
 - GitHub: [@jorgesandovalpablo](https://github.com/jorgesandovalpablo)
+- LinkedIn: [jorgesandovalpablo](https://linkedin.com/in/jorgesandovalpablo)
+- Email: jorgesandovalpablo@gmail.com
+
+> Apasionado por transformar datos en decisiones de negocio medibles.
+> Este proyecto demuestra un pipeline de ML production-grade:
+Feature Engineering stateful, walk-forward CV, SHAP, Optuna,
+CI/CD con retraining automático y Model Registry.
 
 ---
 
