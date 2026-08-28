@@ -9,6 +9,7 @@ import json
 import numpy as np
 import pandas as pd
 import pytest
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from src.models.tune import (
@@ -202,7 +203,7 @@ class TestSaveTuningResults:
         metrics = {"mae": 123.45, "rmse": 200.0}
 
         with patch("src.models.tune.joblib.dump"):
-            _save_tuning_results(
+            result = _save_tuning_results(
                 horizon=7,
                 study=study,
                 model=model,
@@ -216,6 +217,7 @@ class TestSaveTuningResults:
         assert params_file.exists()
         assert metrics_file.exists()
         assert stats_file.exists()
+        assert result == params_file
 
         with open(params_file) as f:
             data = json.load(f)
@@ -249,6 +251,8 @@ class TestSaveTuningResults:
 class TestRunOptunaSearch:
     """run_optuna_search orquesta el flujo completo con mocks."""
 
+    @patch("src.models.tune.mlflow")
+    @patch("src.models.tune.setup_mlflow")
     @patch("src.models.tune._save_tuning_results")
     @patch("src.models.tune._train_with_best_params")
     @patch("src.models.tune._objective")
@@ -259,13 +263,15 @@ class TestRunOptunaSearch:
     def test_runs_and_saves_results(
         self, mock_create_study, mock_read_parquet,
         mock_pipeline_cls, mock_splits, mock_obj,
-        mock_train, mock_save, fake_df,
+        mock_train, mock_save, mock_setup_mlflow,
+        mock_mlflow, fake_df,
     ):
         mock_read_parquet.return_value = fake_df
         pipeline = MagicMock()
         pipeline.transform.return_value = fake_df
         mock_pipeline_cls.return_value = pipeline
         mock_train.return_value = (MagicMock(), {"mae": 100.0})
+        mock_save.return_value = Path("/tmp/best_params_h7.json")
 
         mock_study = MagicMock()
         mock_study.best_trial.number = 0
@@ -274,6 +280,9 @@ class TestRunOptunaSearch:
         mock_study.trials = [MagicMock()]
         mock_create_study.return_value = mock_study
 
+        mock_mlflow.start_run.return_value.__enter__ = MagicMock()
+        mock_mlflow.start_run.return_value.__exit__ = MagicMock()
+
         study, model, metrics = run_optuna_search(
             horizon=7, n_trials=2, output_dir="/tmp/test_optuna",
         )
@@ -281,7 +290,11 @@ class TestRunOptunaSearch:
         assert study is mock_study
         mock_save.assert_called_once()
         mock_train.assert_called_once()
+        mock_setup_mlflow.assert_called_once()
+        mock_mlflow.start_run.assert_called_once()
 
+    @patch("src.models.tune.mlflow")
+    @patch("src.models.tune.setup_mlflow")
     @patch("src.models.tune._save_tuning_results")
     @patch("src.models.tune._train_with_best_params")
     @patch("src.models.tune._objective")
@@ -292,7 +305,8 @@ class TestRunOptunaSearch:
     def test_passes_config_params(
         self, mock_create_study, mock_read_parquet,
         mock_pipeline_cls, mock_splits, mock_obj,
-        mock_train, mock_save, fake_df,
+        mock_train, mock_save, mock_setup_mlflow,
+        mock_mlflow, fake_df,
     ):
         mock_read_parquet.return_value = fake_df
         pipeline = MagicMock()
@@ -300,6 +314,7 @@ class TestRunOptunaSearch:
         mock_pipeline_cls.return_value = pipeline
         mock_train.return_value = (MagicMock(), {"mae": 100.0})
         mock_obj.return_value = 100.0
+        mock_save.return_value = Path("/tmp/best_params_h30.json")
 
         mock_study = MagicMock()
         mock_study.best_trial.number = 0
@@ -318,6 +333,9 @@ class TestRunOptunaSearch:
             trial.should_prune.return_value = False
             obj_fn(trial)
         mock_study.optimize.side_effect = capture_optimize
+
+        mock_mlflow.start_run.return_value.__enter__ = MagicMock()
+        mock_mlflow.start_run.return_value.__exit__ = MagicMock()
 
         run_optuna_search(
             horizon=30, n_trials=1, timeout=60,

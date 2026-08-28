@@ -12,6 +12,7 @@ Coste estimado: ~8-12 min/trial → 50 trials en ~8-10 horas.
 import json
 import numpy as np
 import pandas as pd
+import mlflow
 import optuna
 import joblib
 from pathlib import Path
@@ -25,6 +26,7 @@ from src.models.train import (
     get_feature_cols,
     _train_fold,
     _train_final_model,
+    setup_mlflow,
 )
 from src.models.validation import walk_forward_splits
 
@@ -169,6 +171,7 @@ def run_optuna_search(
     early_stopping_rounds = optuna_cfg.get('early_stopping_rounds', 50)
 
     set_global_seed(config['project']['seed'])
+    setup_mlflow()
 
     # ── 1. Feature engineering una vez ──
     logger.info("=" * 50)
@@ -203,43 +206,61 @@ def run_optuna_search(
     else:
         df_sub = df
 
-    # ── 3. Optuna study ──
-    pruner = optuna.pruners.HyperbandPruner(
-        min_resource=1,
-        max_resource=max_boost_round,
-        reduction_factor=3,
-    )
-    study = optuna.create_study(
-        direction="minimize",
-        pruner=pruner,
-        study_name=f"lgbm_h{horizon}",
-    )
+    # ── 3. Optuna study + MLflow ──
+    mlflow.set_experiment(config['mlflow']['experiment_name'])
 
-    logger.info("Iniciando Optuna study...")
-    study.optimize(
-        lambda trial: _objective(
-            trial, df_sub, feature_cols, horizon,
-            n_folds, max_boost_round, early_stopping_rounds,
-        ),
-        n_trials=n_trials,
-        timeout=timeout,
-        show_progress_bar=True,
-    )
+    with mlflow.start_run(run_name=f"optuna_h{horizon}"):
+        mlflow.log_param("horizon", horizon)
+        mlflow.log_param("n_trials", n_trials)
+        mlflow.log_param("timeout", timeout)
+        mlflow.log_param("subsample_ratio", subsample_ratio)
+        mlflow.log_param("n_folds_tune", n_folds)
+        mlflow.log_param("max_boost_round", max_boost_round)
+        mlflow.log_param("early_stopping", early_stopping_rounds)
 
-    best = study.best_trial
-    logger.info(f"Best trial #{best.number}: MAE={best.value:.4f}")
-    logger.info(f"Best params: {best.params}")
+        pruner = optuna.pruners.HyperbandPruner(
+            min_resource=1,
+            max_resource=max_boost_round,
+            reduction_factor=3,
+        )
+        study = optuna.create_study(
+            direction="minimize",
+            pruner=pruner,
+            study_name=f"lgbm_h{horizon}",
+        )
 
-    # ── 4. Modelo final con best params en datos completos ──
-    best_params = build_params_from_dict(best.params, horizon)
-    best_model, best_metrics = _train_with_best_params(
-        horizon, best_params, df, feature_cols, pipeline
-    )
+        logger.info("Iniciando Optuna study...")
+        study.optimize(
+            lambda trial: _objective(
+                trial, df_sub, feature_cols, horizon,
+                n_folds, max_boost_round, early_stopping_rounds,
+            ),
+            n_trials=n_trials,
+            timeout=timeout,
+            show_progress_bar=True,
+        )
 
-    # ── 5. Guardar resultados ──
-    _save_tuning_results(
-        horizon, study, best_model, best_metrics, output_dir
-    )
+        best = study.best_trial
+        logger.info(f"Best trial #{best.number}: MAE={best.value:.4f}")
+        logger.info(f"Best params: {best.params}")
+
+        mlflow.log_metric("best_mae", best.value)
+        mlflow.log_param("best_trial", best.number)
+        mlflow.log_params(best.params)
+
+        # ── 4. Modelo final con best params en datos completos ──
+        best_params = build_params_from_dict(best.params, horizon)
+        best_model, best_metrics = _train_with_best_params(
+            horizon, best_params, df, feature_cols, pipeline
+        )
+
+        # ── 5. Guardar resultados ──
+        params_path = _save_tuning_results(
+            horizon, study, best_model, best_metrics, output_dir
+        )
+        mlflow.log_artifact(str(params_path))
+        mlflow.log_metric("cv_mae_final", best_metrics.get("mae_mean", 0))
+        mlflow.log_metric("cv_wape_final", best_metrics.get("wape_mean", 0))
 
     return study, best_model, best_metrics
 
@@ -314,8 +335,11 @@ def _save_tuning_results(
     model,
     metrics: dict,
     output_dir: str,
-) -> None:
-    """Guarda best params, métricas y modelo tunneado."""
+) -> Path:
+    """
+    Guarda best params, métricas y modelo tunneado.
+    Retorna la ruta del archivo de params (para MLflow artifact logging).
+    """
     out_path = Path(output_dir)
     out_path.mkdir(parents=True, exist_ok=True)
 
@@ -349,6 +373,17 @@ def _save_tuning_results(
     model_path = models_path / f"lgbm_tuned_h{horizon}.pkl"
     joblib.dump(model, model_path)
     logger.info(f"Modelo tunneado guardado: {model_path}")
+
+    # Guidance para el usuario
+    logger.info("=" * 50)
+    logger.info("Tuning completado. Para entrenar el modelo final:")
+    logger.info(
+        f"  python src/models/train.py --horizon {horizon}"
+        f" --params-file {params_path}"
+    )
+    logger.info("=" * 50)
+
+    return params_path
 
 
 # ─────────────────────────────────────────

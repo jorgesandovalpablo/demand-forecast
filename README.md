@@ -176,7 +176,7 @@ retrain.py
 | **Versionado datos** | DVC | ⚠️ Pendiente — declarado en requirements pero sin uso en src/ |
 | **Dependencias** | pip-tools | Versiones exactas y reproducibles |
 | **Calidad** | Black + Flake8 + isort | Estilo y linting automático |
-| **Tests** | pytest | 54 tests unitarios/de integración (features, API, Model Registry, SHAP y Optuna) |
+| **Tests** | pytest | 56 tests unitarios/de integración (features, API, Model Registry, SHAP, Optuna y train) |
 
 ---
 
@@ -683,7 +683,7 @@ contribución media absoluta a las predicciones.
 Última actualización: 2026-08-27.
 
 ### Implementado y verificado
-- Pipeline de features stateful con paridad train/serving testada (54 tests).
+- Pipeline de features stateful con paridad train/serving testada (56 tests).
 - Promoción segura en retraining (staging → comparación → producción con backups).
 - `evaluate.py` reconstruyendo features desde el pipeline serializado.
 - Intervalos de confianza calculados en escala log desde las stats históricas completas.
@@ -709,6 +709,15 @@ contribución media absoluta a las predicciones.
 ---
 
 ## 📝 CHANGELOG
+
+### v0.4.2 (2026-08-27)
+- **Optuna ↔ train.py integration:**
+  - `train.py --params-file reports/optuna/best_params_h7.json`:
+    override de hiperparámetros desde JSON de Optuna (backward-compatible).
+  - `tune.py` ahora registra en MLflow/DagsHub (params, metrics, artifacts).
+  - `_save_tuning_results()` retorna `params_path` y loguea el comando
+    exacto para entrenar con los mejores params.
+- Tests: 54 → 56 (2 nuevos en `test_train.py`).
 
 ### v0.4.1 (2026-08-27)
 - **Optuna tuning:** nuevo `src/models/tune.py` con búsqueda

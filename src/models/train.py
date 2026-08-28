@@ -1,3 +1,4 @@
+import json
 import numpy as np
 import pandas as pd
 import lightgbm as lgb
@@ -244,7 +245,11 @@ def _save_model(
 # ─────────────────────────────────────────
 # Función principal — punto de entrada
 # ─────────────────────────────────────────
-def run_training(horizon: int, output_suffix: str = "") -> dict:
+def run_training(
+    horizon: int,
+    output_suffix: str = "",
+    params_file: Optional[str] = None,
+) -> dict:
     """
     Ejecuta el pipeline completo de entrenamiento
     para un horizonte específico.
@@ -255,6 +260,8 @@ def run_training(horizon: int, output_suffix: str = "") -> dict:
         output_suffix: sufijo para los artefactos de salida.
                        Vacío escribe en producción; '_new'
                        escribe a staging (usado por retrain.py).
+        params_file: path a JSON con params de Optuna para override.
+                     Si es None, usa config.yaml (default).
 
     Retorna:
         dict con modelo entrenado y métricas
@@ -268,7 +275,15 @@ def run_training(horizon: int, output_suffix: str = "") -> dict:
         if horizon == 7
         else 'params_lgbm_mensual'
     )
-    params = config['model'][params_key]
+    params = dict(config['model'][params_key])
+
+    # Override con params de Optuna si se provee
+    if params_file:
+        with open(params_file) as f:
+            override = json.load(f)
+        params.update(override)
+        logger.info(f"Params override desde: {params_file}")
+        logger.info(f"  Keys overridden: {list(override.keys())}")
 
     # Cargar features (Data Procesada, no Feature-Engineered)
     features_path = "data/processed/train_processed.parquet"
@@ -411,6 +426,12 @@ if __name__ == "__main__":
         required=True,
         help='Horizonte de predicción: 7 (diario) o 30 (mensual)'
     )
+    parser.add_argument(
+        '--params-file',
+        type=str,
+        default=None,
+        help='JSON con params de Optuna para override (opcional)'
+    )
     args = parser.parse_args()
 
-    run_training(horizon=args.horizon)
+    run_training(horizon=args.horizon, params_file=args.params_file)
