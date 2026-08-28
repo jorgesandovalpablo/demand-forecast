@@ -309,7 +309,9 @@ demand-forecast/
 │   ├── test_api.py            # Contrato HTTP de la API (mockeado)
 │   ├── test_registry.py       # MLflow Model Registry
 │   ├── test_shap.py           # SHAP analysis
-│   └── test_tune.py           # Optuna tuning
+│   ├── test_tune.py           # Optuna tuning
+│   ├── test_retrain.py        # Retrain + params-file propagation
+│   └── test_train.py          # Train defaults
 │
 ├── logs/                      # Logs operacionales (no versionados)
 ├── .env.example               # Variables de entorno de ejemplo
