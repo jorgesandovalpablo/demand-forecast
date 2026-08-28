@@ -176,7 +176,7 @@ retrain.py
 | **Versionado datos** | DVC | ⚠️ Pendiente — declarado en requirements pero sin uso en src/ |
 | **Dependencias** | pip-tools | Versiones exactas y reproducibles |
 | **Calidad** | Black + Flake8 + isort | Estilo y linting automático |
-| **Tests** | pytest | 56 tests unitarios/de integración (features, API, Model Registry, SHAP, Optuna y train) |
+| **Tests** | pytest | 61 tests unitarios/de integración (features, API, Model Registry, SHAP, Optuna, train y retrain) |
 
 ---
 
@@ -683,7 +683,7 @@ contribución media absoluta a las predicciones.
 Última actualización: 2026-08-27.
 
 ### Implementado y verificado
-- Pipeline de features stateful con paridad train/serving testada (56 tests).
+- Pipeline de features stateful con paridad train/serving testada (61 tests).
 - Promoción segura en retraining (staging → comparación → producción con backups).
 - `evaluate.py` reconstruyendo features desde el pipeline serializado.
 - Intervalos de confianza calculados en escala log desde las stats históricas completas.
@@ -710,10 +710,16 @@ contribución media absoluta a las predicciones.
 
 ## 📝 CHANGELOG
 
+### v0.4.3 (2026-08-27)
+- **Optuna ↔ retrain.py integration:**
+  - `--params-file` movido de `train.py` a `retrain.py` (quality gate obligatorio).
+  - Flujo: `tune.py` → `retrain.py --params-file reports/optuna/best_params_h30.json`.
+  - `retrain.py` entrena a staging, evalúa contra baseline, promueve solo si mejora MAE ≥1%.
+- `train.py` revertido a building block puro (sin `--params-file`).
+- Tests: 56 → 61 (5 nuevos en `test_retrain.py`: propagación params + `_should_update_model`).
+
 ### v0.4.2 (2026-08-27)
 - **Optuna ↔ train.py integration:**
-  - `train.py --params-file reports/optuna/best_params_h7.json`:
-    override de hiperparámetros desde JSON de Optuna (backward-compatible).
   - `tune.py` ahora registra en MLflow/DagsHub (params, metrics, artifacts).
   - `_save_tuning_results()` retorna `params_path` y loguea el comando
     exacto para entrenar con los mejores params.

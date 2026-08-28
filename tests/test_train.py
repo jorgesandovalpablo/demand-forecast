@@ -1,9 +1,9 @@
 """
 Tests del módulo de entrenamiento.
 
-Valida la lógica de params_file override y CLI args.
+Valida que run_training funciona correctamente con config.yaml.
+El override de params_file vive en test_retrain.py.
 """
-import json
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
@@ -43,10 +43,10 @@ def _mock_fold_model():
 
 
 # ─────────────────────────────────────────
-# Tests de run_training con params_file
+# Tests de run_training (config.yaml)
 # ─────────────────────────────────────────
-class TestParamsFileOverride:
-    """run_training acepta params_file para override de config.yaml."""
+class TestRunTraining:
+    """run_training usa params de config.yaml por defecto."""
 
     @patch("src.models.train._save_model")
     @patch("src.models.train._train_final_model")
@@ -56,56 +56,7 @@ class TestParamsFileOverride:
     @patch("src.models.train.pd.read_parquet")
     @patch("src.models.train.setup_mlflow")
     @patch("src.models.train.mlflow")
-    def test_params_file_overrides_config(
-        self, mock_mlflow, mock_setup, mock_read_parquet,
-        mock_pipeline_cls, mock_splits, mock_train_fold,
-        mock_final_model, mock_save, tmp_path,
-    ):
-        """params_file overridea los params de config.yaml."""
-        from src.models.train import run_training
-
-        fake_df = _fake_df()
-        mock_read_parquet.return_value = fake_df
-        pipeline = MagicMock()
-        pipeline.transform.return_value = fake_df
-        mock_pipeline_cls.return_value = pipeline
-
-        mock_train_fold.return_value = (_mock_fold_model(), _mock_fold_result())
-        mock_splits.return_value = [
-            (pd.RangeIndex(50), pd.RangeIndex(50, 100), {"fold": 1}),
-        ]
-
-        mock_final_model.return_value = MagicMock()
-        mock_save.return_value = (Path("models/lgbm_h7.pkl"), Path("models/feature_pipeline_h7.pkl"))
-
-        params_file = tmp_path / "best_params_h7.json"
-        override = {"num_leaves": 47, "learning_rate": 0.031}
-        params_file.write_text(json.dumps(override))
-
-        mock_mlflow.start_run.return_value.__enter__ = MagicMock()
-        mock_mlflow.start_run.return_value.__exit__ = MagicMock()
-
-        result = run_training(horizon=7, params_file=str(params_file))
-
-        assert result is not None
-        assert "model" in result
-        mock_final_model.assert_called_once()
-
-        # Verificar que los params override se pasaron
-        call_kwargs = mock_final_model.call_args
-        params_used = call_kwargs[1]["params"]
-        assert params_used["num_leaves"] == 47
-        assert params_used["learning_rate"] == 0.031
-
-    @patch("src.models.train._save_model")
-    @patch("src.models.train._train_final_model")
-    @patch("src.models.train._train_fold")
-    @patch("src.models.train.walk_forward_splits")
-    @patch("src.features.build_features.DemandFeatureEngineer")
-    @patch("src.models.train.pd.read_parquet")
-    @patch("src.models.train.setup_mlflow")
-    @patch("src.models.train.mlflow")
-    def test_no_params_file_uses_config(
+    def test_run_training_uses_config_defaults(
         self, mock_mlflow, mock_setup, mock_read_parquet,
         mock_pipeline_cls, mock_splits, mock_train_fold,
         mock_final_model, mock_save,

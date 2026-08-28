@@ -4,6 +4,7 @@ import joblib
 import shutil
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 from src.utils.logger import get_logger
 from src.utils.config import config
 from src.utils.seed import set_global_seed
@@ -232,7 +233,8 @@ def _discard_staging(horizon: int) -> None:
 # ─────────────────────────────────────────
 def run_retraining(
     horizon: int,
-    force: bool = False
+    force: bool = False,
+    params_file: Optional[str] = None,
 ) -> dict:
     """
     Ejecuta el pipeline completo de
@@ -242,6 +244,8 @@ def run_retraining(
         horizon: 7 (diario) o 30 (mensual)
         force:   si True, actualiza el modelo
                  sin importar las métricas
+        params_file: path a JSON con params de Optuna
+                     para override (opcional).
 
     Retorna:
         dict con resultados del reentrenamiento
@@ -284,7 +288,11 @@ def run_retraining(
 
         # ── Paso 3: Entrenar nuevo modelo a staging ──
         logger.info("Entrenando nuevo modelo (staging)...")
-        result = run_training(horizon=horizon, output_suffix="_new")
+        result = run_training(
+            horizon=horizon,
+            output_suffix="_new",
+            params_file=params_file,
+        )
         df = result['df']
 
         # ── Paso 4: Evaluar nuevo modelo ──
@@ -358,9 +366,16 @@ if __name__ == "__main__":
         default=False,
         help='Forzar actualización sin comparar métricas'
     )
+    parser.add_argument(
+        '--params-file',
+        type=str,
+        default=None,
+        help='JSON con params de Optuna para override (opcional)'
+    )
     args = parser.parse_args()
 
     run_retraining(
         horizon=args.horizon,
-        force=args.force
+        force=args.force,
+        params_file=args.params_file,
     )
