@@ -247,6 +247,7 @@ def _save_model(
 def run_training(
     horizon: int,
     output_suffix: str = "",
+    params_file: Optional[str] = None,
 ) -> dict:
     """
     Ejecuta el pipeline completo de entrenamiento
@@ -272,6 +273,13 @@ def run_training(
         else 'params_lgbm_mensual'
     )
     params = dict(config['model'][params_key])
+
+    if params_file:
+        import json
+        with open(params_file) as f:
+            override = json.load(f)
+        params.update(override)
+        logger.info(f"Params override desde {params_file}")
 
     # Cargar features (Data Procesada, no Feature-Engineered)
     features_path = "data/processed/train_processed.parquet"
