@@ -104,11 +104,11 @@ class TestSuggestParams:
 
     def test_num_leaves_in_valid_range(self, mock_optuna_trial):
         params = suggest_params(mock_optuna_trial, horizon=7)
-        assert 20 <= params["num_leaves"] <= 127
+        assert 15 <= params["num_leaves"] <= 256
 
     def test_learning_rate_in_valid_range(self, mock_optuna_trial):
         params = suggest_params(mock_optuna_trial, horizon=7)
-        assert 0.01 <= params["learning_rate"] <= 0.15
+        assert 0.005 <= params["learning_rate"] <= 0.2
 
 
 class TestBuildParamsFromDict:
@@ -346,5 +346,5 @@ class TestRunOptunaSearch:
         call_args = mock_obj.call_args[0]
         assert isinstance(call_args[2], list)  # feature_cols
         assert call_args[3] == 30  # horizon
-        assert call_args[4] == 3   # n_folds
-        assert call_args[5] == 400  # max_boost_round
+        assert call_args[4] == 4   # n_folds
+        assert call_args[5] == 600  # max_boost_round

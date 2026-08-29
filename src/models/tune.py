@@ -38,42 +38,67 @@ logger = get_logger(__name__)
 # ─────────────────────────────────────────
 def suggest_params(trial: optuna.Trial, horizon: int) -> dict:
     """
-    Space de búsqueda para Optuna.
+    Space de búsqueda para Optuna — ranges diferenciados por horizon.
 
     Fijo: objective, metric, random_state, n_jobs, verbosity.
-    Tunneables: num_leaves, learning_rate, min_data_in_leaf,
-                lambda_l1, lambda_l2, feature_fraction,
-                bagging_fraction, bagging_freq, max_bin.
+    Tunneables (horizon-specific): num_leaves, learning_rate,
+        min_data_in_leaf, lambda_l1, lambda_l2.
+    Tunneables (shared): feature_fraction, bagging_fraction,
+        bagging_freq, max_bin.
     """
-    return {
+    fixed = {
         "objective": "regression_l1" if horizon == 7 else "huber",
         "metric": "mae",
         "random_state": 42,
         "verbosity": -1,
         "n_jobs": 1,
+    }
 
-        "num_leaves": trial.suggest_int("num_leaves", 20, 127),
-        "learning_rate": trial.suggest_float(
-            "learning_rate", 0.01, 0.15, log=True
-        ),
-        "min_data_in_leaf": trial.suggest_int(
-            "min_data_in_leaf", 10, 200, log=True
-        ),
-        "lambda_l1": trial.suggest_float(
-            "lambda_l1", 1e-8, 10.0, log=True
-        ),
-        "lambda_l2": trial.suggest_float(
-            "lambda_l2", 1e-8, 10.0, log=True
-        ),
+    if horizon == 7:
+        tunable = {
+            "num_leaves": trial.suggest_int("num_leaves", 15, 256),
+            "learning_rate": trial.suggest_float(
+                "learning_rate", 0.005, 0.2, log=True
+            ),
+            "min_data_in_leaf": trial.suggest_int(
+                "min_data_in_leaf", 5, 200, log=True
+            ),
+            "lambda_l1": trial.suggest_float(
+                "lambda_l1", 1e-8, 5.0, log=True
+            ),
+            "lambda_l2": trial.suggest_float(
+                "lambda_l2", 1e-8, 5.0, log=True
+            ),
+        }
+    else:
+        tunable = {
+            "num_leaves": trial.suggest_int("num_leaves", 15, 256),
+            "learning_rate": trial.suggest_float(
+                "learning_rate", 0.005, 0.15, log=True
+            ),
+            "min_data_in_leaf": trial.suggest_int(
+                "min_data_in_leaf", 5, 300, log=True
+            ),
+            "lambda_l1": trial.suggest_float(
+                "lambda_l1", 1e-8, 10.0, log=True
+            ),
+            "lambda_l2": trial.suggest_float(
+                "lambda_l2", 1e-8, 10.0, log=True
+            ),
+        }
+
+    shared = {
         "feature_fraction": trial.suggest_float(
-            "feature_fraction", 0.5, 1.0
+            "feature_fraction", 0.4, 1.0
         ),
         "bagging_fraction": trial.suggest_float(
-            "bagging_fraction", 0.5, 1.0
+            "bagging_fraction", 0.4, 1.0
         ),
         "bagging_freq": trial.suggest_int("bagging_freq", 1, 7),
         "max_bin": trial.suggest_int("max_bin", 100, 300),
     }
+
+    return {**fixed, **tunable, **shared}
 
 
 def build_params_from_dict(
@@ -154,7 +179,7 @@ def run_optuna_search(
 
     Flujo:
         1. Feature engineering una sola vez (~5-10 min)
-        2. Subsampleo estratificado 15%
+        2. Subsampleo estratificado 30%
         3. Optuna study (n_trials o timeout)
         4. Modelo final con best params en datos completos
         5. Guardado de resultados
@@ -219,9 +244,9 @@ def run_optuna_search(
         mlflow.log_param("early_stopping", early_stopping_rounds)
 
         pruner = optuna.pruners.HyperbandPruner(
-            min_resource=1,
+            min_resource=20,
             max_resource=max_boost_round,
-            reduction_factor=3,
+            reduction_factor=4,
         )
         study = optuna.create_study(
             direction="minimize",
