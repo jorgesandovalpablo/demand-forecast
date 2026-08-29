@@ -197,10 +197,14 @@ retrain.py
 | Métrica | Test Set |
 |---|---|
 | RMSE | 291.48 |
-| MAE | 81.22 |
+| MAE | 57.89 |
 | MAPE | 39.19% |
 | WAPE | **17.16%** |
 | RMSLE | 0.4359 |
+
+> 📌 **Optuna h30 (2026-08-28):** MAE mejoró de 81.22 → 57.89
+> (**-28.73%**) tras tuning de hiperparámetros y promoción automática
+> via `retrain.py --params-file`.
 
 > 📌 Métricas sobre split temporal train/test vía `evaluate.py` con los
 > artefactos vigentes (`lgbm_daily@production v2` / `lgbm_monthly@production v1`
@@ -711,6 +715,14 @@ contribución media absoluta a las predicciones.
 ---
 
 ## 📝 CHANGELOG
+
+### v0.4.4 (2026-08-28)
+- **Optuna h30 promovido a producción:** MAE 81.22 → 57.89 (-28.73%).
+  - `retrain.py --params-file reports/optuna/best_params_h30.json`
+  - Quality gate: staging → evaluate → compara MAE ≥1% → promueve.
+  - Backups timestamped de los 3 artefactos para rollback.
+- **Fix `params_file` en `train.py`:** `run_training()` ahora acepta `params_file` param y aplica override desde JSON sobre config.yaml.
+- `retrain.py` ya propagaba el param, pero `train.py` no lo aceptaba — fix de compatibilidad.
 
 ### v0.4.3 (2026-08-27)
 - **Optuna ↔ retrain.py integration:**
