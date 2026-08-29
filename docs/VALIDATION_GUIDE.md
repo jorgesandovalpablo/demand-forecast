@@ -1,4 +1,4 @@
-# Guía de Validación End-to-End — v0.4.3
+# Guía de Validación End-to-End — v0.4.4
 
 Objetivo: verificar el pipeline completo con el `DemandFeatureEngineer`
 stateful y la promoción segura de modelos, y capturar las métricas

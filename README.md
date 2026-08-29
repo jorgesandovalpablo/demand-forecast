@@ -686,7 +686,7 @@ contribución media absoluta a las predicciones.
 
 ## ⚠️ Estado actual y limitaciones
 
-Última actualización: 2026-08-27.
+Última actualización: 2026-08-28.
 
 ### Implementado y verificado
 - Pipeline de features stateful con paridad train/serving testada (61 tests).

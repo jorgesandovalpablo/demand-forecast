@@ -1,13 +1,14 @@
 """
 Optuna hyperparameter tuning para LightGBM.
 
-Estrategia conservadora (laptop sin GPU):
-  - Subsampleo 15% de filas (stratificado por store+family)
-  - 3 folds walk-forward (vs 5 en entrenamiento normal)
-  - 400 boosting rounds con early stopping 50 (vs 1500/150)
+Estrategia agresiva (laptop sin GPU):
+  - Subsampleo 30% de filas (stratificado por store+family)
+  - 4 folds walk-forward (vs 5 en entrenamiento normal)
+  - 600 boosting rounds con early stopping 80
   - Feature engineering caching (una sola vez por study)
+  - Ranges diferenciados por horizon (h7: L1, h30: Huber)
 
-Coste estimado: ~8-12 min/trial → 50 trials en ~8-10 horas.
+Coste estimado: ~10-15 min/trial → 150 trials en ~25-35 horas.
 """
 import json
 import numpy as np
@@ -134,7 +135,7 @@ def _objective(
     early_stopping_rounds: int,
 ) -> float:
     """
-    Evalúa un trial: sugiere params → 3-fold CV → retorna mean MAE.
+    Evalúa un trial: sugiere params → 4-fold CV → retorna mean MAE.
 
     Cada trial usa subsampleo (ya aplicado al df de entrada) y
     configuración reducida para ser viable en CPU (~8-12 min).
@@ -188,12 +189,12 @@ def run_optuna_search(
         tuple: (study, best_model, best_metrics)
     """
     optuna_cfg = config.get('optuna', {})
-    n_trials = n_trials or optuna_cfg.get('n_trials', 50)
-    timeout = timeout or optuna_cfg.get('timeout_seconds', 36000)
-    n_folds = optuna_cfg.get('n_folds', 3)
-    subsample_ratio = optuna_cfg.get('subsample_ratio', 0.15)
-    max_boost_round = optuna_cfg.get('max_boost_round', 400)
-    early_stopping_rounds = optuna_cfg.get('early_stopping_rounds', 50)
+    n_trials = n_trials or optuna_cfg.get('n_trials', 150)
+    timeout = timeout or optuna_cfg.get('timeout_seconds', 28800)
+    n_folds = optuna_cfg.get('n_folds', 4)
+    subsample_ratio = optuna_cfg.get('subsample_ratio', 0.30)
+    max_boost_round = optuna_cfg.get('max_boost_round', 600)
+    early_stopping_rounds = optuna_cfg.get('early_stopping_rounds', 80)
 
     set_global_seed(config['project']['seed'])
     setup_mlflow()
