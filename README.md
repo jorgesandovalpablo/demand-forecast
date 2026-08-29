@@ -704,7 +704,7 @@ contribución media absoluta a las predicciones.
 ### Pendientes
 | Ítem | Detalle |
 |---|---|
-| Secrets de CI | Configurar `MLFLOW_TRACKING_USERNAME/PASSWORD` y opcionalmente `KAGGLE_USERNAME/KEY` + repo variable `KAGGLE_DOWNLOAD_ENABLED=true` para el retraining programado |
+| Secrets de CI | ✅ Configurados: `MLFLOW_TRACKING_USERNAME/PASSWORD` en GitHub Actions |
 | DVC | Declarado en requirements sin uso; datos/modelos fuera de git |
 | SHAP | Migrado a `src/models/shap_analysis.py`; flag `--shap` en `evaluate.py` |
 
