@@ -176,7 +176,7 @@ retrain.py
 | **Versionado datos** | DVC | ⚠️ Pendiente — declarado en requirements pero sin uso en src/ |
 | **Dependencias** | pip-tools | Versiones exactas y reproducibles |
 | **Calidad** | Black + Flake8 + isort | Estilo y linting automático |
-| **Tests** | pytest | 61 tests unitarios/de integración (features, API, Model Registry, SHAP, Optuna, train y retrain) |
+| **Tests** | pytest | 63 tests unitarios/de integración (features, API, Model Registry, SHAP, Optuna, train y retrain) |
 
 ---
 
@@ -689,7 +689,7 @@ contribución media absoluta a las predicciones.
 Última actualización: 2026-08-28.
 
 ### Implementado y verificado
-- Pipeline de features stateful con paridad train/serving testada (61 tests).
+- Pipeline de features stateful con paridad train/serving testada (63 tests).
 - Promoción segura en retraining (staging → comparación → producción con backups).
 - `evaluate.py` reconstruyendo features desde el pipeline serializado.
 - Intervalos de confianza calculados en escala log desde las stats históricas completas.
@@ -722,7 +722,10 @@ contribución media absoluta a las predicciones.
   - Quality gate: staging → evaluate → compara MAE ≥1% → promueve.
   - Backups timestamped de los 3 artefactos para rollback.
 - **Fix `params_file` en `train.py`:** `run_training()` ahora acepta `params_file` param y aplica override desde JSON sobre config.yaml.
+- **Optuna SQLite resume:** `storage: "sqlite:///data/optuna_studies.db"` + `load_if_exists=True` → reanudar tune interrumpido sin perder trials. `MaxTrialsCallback` safety net.
+- **Optuna n_jobs=2:** LightGBM usa 2 threads por trial + `study.optimize(n_jobs=2)` para 2 trials en paralelo. ~3x más rápido.
 - `retrain.py` ya propagaba el param, pero `train.py` no lo aceptaba — fix de compatibilidad.
+- Tests: 61 → 63 (2 nuevos en `test_tune.py`: resume load + resume skip).
 
 ### v0.4.3 (2026-08-27)
 - **Optuna ↔ retrain.py integration:**
