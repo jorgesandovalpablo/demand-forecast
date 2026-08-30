@@ -98,9 +98,9 @@ class TestSuggestParams:
         params = suggest_params(mock_optuna_trial, horizon=30)
         assert params["objective"] == "huber"
 
-    def test_n_jobs_is_1_for_reproducibility(self, mock_optuna_trial):
+    def test_n_jobs_is_2_for_reproducibility(self, mock_optuna_trial):
         params = suggest_params(mock_optuna_trial, horizon=7)
-        assert params["n_jobs"] == 1
+        assert params["n_jobs"] == 2
 
     def test_num_leaves_in_valid_range(self, mock_optuna_trial):
         params = suggest_params(mock_optuna_trial, horizon=7)

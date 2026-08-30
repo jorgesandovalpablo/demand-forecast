@@ -54,7 +54,7 @@ def suggest_params(trial: optuna.Trial, horizon: int) -> dict:
         "metric": "mae",
         "random_state": 42,
         "verbosity": -1,
-        "n_jobs": 1,
+        "n_jobs": 2,
     }
 
     if horizon == 7:
@@ -313,6 +313,7 @@ def run_optuna_search(
                 ),
                 n_trials=remaining,
                 timeout=timeout,
+                n_jobs=2,
                 callbacks=callbacks,
                 show_progress_bar=True,
             )
