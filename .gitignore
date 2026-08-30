@@ -240,6 +240,10 @@ test_build_festures.py
 mlflow.db
 mlruns/
 
+# Optuna SQLite
+data/optuna_studies.db
+data/optuna_studies.db-journal
+
 #archivos antigravity
 AGENTS.md
 PROJECT_KNOWLEDGE.md

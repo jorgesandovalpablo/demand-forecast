@@ -260,8 +260,9 @@ class TestRunOptunaSearch:
     @patch("src.models.tune.DemandFeatureEngineer")
     @patch("src.models.tune.pd.read_parquet")
     @patch("src.models.tune.optuna.create_study")
+    @patch("src.models.tune.optuna.storages.RDBStorage")
     def test_runs_and_saves_results(
-        self, mock_create_study, mock_read_parquet,
+        self, mock_rdbstorage, mock_create_study, mock_read_parquet,
         mock_pipeline_cls, mock_splits, mock_obj,
         mock_train, mock_save, mock_setup_mlflow,
         mock_mlflow, fake_df,
@@ -302,8 +303,9 @@ class TestRunOptunaSearch:
     @patch("src.models.tune.DemandFeatureEngineer")
     @patch("src.models.tune.pd.read_parquet")
     @patch("src.models.tune.optuna.create_study")
+    @patch("src.models.tune.optuna.storages.RDBStorage")
     def test_passes_config_params(
-        self, mock_create_study, mock_read_parquet,
+        self, mock_rdbstorage, mock_create_study, mock_read_parquet,
         mock_pipeline_cls, mock_splits, mock_obj,
         mock_train, mock_save, mock_setup_mlflow,
         mock_mlflow, fake_df,
@@ -348,3 +350,107 @@ class TestRunOptunaSearch:
         assert call_args[3] == 30  # horizon
         assert call_args[4] == 4   # n_folds
         assert call_args[5] == 600  # max_boost_round
+
+    @patch("src.models.tune.mlflow")
+    @patch("src.models.tune.setup_mlflow")
+    @patch("src.models.tune._save_tuning_results")
+    @patch("src.models.tune._train_with_best_params")
+    @patch("src.models.tune._objective")
+    @patch("src.models.tune.walk_forward_splits")
+    @patch("src.models.tune.DemandFeatureEngineer")
+    @patch("src.models.tune.pd.read_parquet")
+    @patch("src.models.tune.optuna.create_study")
+    @patch("src.models.tune.optuna.storages.RDBStorage")
+    def test_resume_loads_existing_study(
+        self, mock_rdbstorage, mock_create_study, mock_read_parquet,
+        mock_pipeline_cls, mock_splits, mock_obj,
+        mock_train, mock_save, mock_setup_mlflow,
+        mock_mlflow, fake_df,
+    ):
+        """load_if_exists=True se pasa al create_study."""
+        mock_read_parquet.return_value = fake_df
+        pipeline = MagicMock()
+        pipeline.transform.return_value = fake_df
+        mock_pipeline_cls.return_value = pipeline
+        mock_train.return_value = (MagicMock(), {"mae": 100.0})
+        mock_obj.return_value = 100.0
+        mock_save.return_value = Path("/tmp/best_params_h7.json")
+
+        mock_study = MagicMock()
+        mock_study.best_trial.number = 0
+        mock_study.best_trial.value = 100.0
+        mock_study.best_trial.params = {}
+        mock_study.best_params = {}
+        mock_study.get_trials.return_value = []
+        mock_create_study.return_value = mock_study
+
+        def capture_optimize(obj_fn, n_trials, timeout, **kw):
+            trial = MagicMock()
+            trial.suggest_int.side_effect = lambda n, lo, hi, **kw: (lo + hi) // 2
+            trial.suggest_float.side_effect = lambda n, lo, hi, **kw: (lo + hi) / 2
+            trial.report = MagicMock()
+            trial.should_prune.return_value = False
+            obj_fn(trial)
+        mock_study.optimize.side_effect = capture_optimize
+
+        mock_mlflow.start_run.return_value.__enter__ = MagicMock()
+        mock_mlflow.start_run.return_value.__exit__ = MagicMock()
+
+        run_optuna_search(
+            horizon=7, n_trials=3, timeout=60,
+            output_dir="/tmp/test_resume",
+        )
+
+        create_kwargs = mock_create_study.call_args[1]
+        assert create_kwargs["load_if_exists"] is True
+        assert create_kwargs["storage"] is not None
+
+    @patch("src.models.tune.mlflow")
+    @patch("src.models.tune.setup_mlflow")
+    @patch("src.models.tune._save_tuning_results")
+    @patch("src.models.tune._train_with_best_params")
+    @patch("src.models.tune._objective")
+    @patch("src.models.tune.walk_forward_splits")
+    @patch("src.models.tune.DemandFeatureEngineer")
+    @patch("src.models.tune.pd.read_parquet")
+    @patch("src.models.tune.optuna.create_study")
+    @patch("src.models.tune.optuna.storages.RDBStorage")
+    def test_resume_skips_when_all_complete(
+        self, mock_rdbstorage, mock_create_study, mock_read_parquet,
+        mock_pipeline_cls, mock_splits, mock_obj,
+        mock_train, mock_save, mock_setup_mlflow,
+        mock_mlflow, fake_df,
+    ):
+        """Si ya hay suficientes trials completados, no ejecuta optimize."""
+        from optuna.trial import TrialState
+
+        mock_read_parquet.return_value = fake_df
+        pipeline = MagicMock()
+        pipeline.transform.return_value = fake_df
+        mock_pipeline_cls.return_value = pipeline
+        mock_train.return_value = (MagicMock(), {"mae": 100.0})
+        mock_obj.return_value = 100.0
+        mock_save.return_value = Path("/tmp/best_params_h7.json")
+
+        mock_study = MagicMock()
+        mock_study.best_trial.number = 0
+        mock_study.best_trial.value = 100.0
+        mock_study.best_trial.params = {}
+        mock_study.best_params = {}
+        # Simular 5 trials completados de 5 target
+        mock_trial = MagicMock()
+        mock_trial.state = TrialState.COMPLETE
+        mock_study.get_trials.return_value = [mock_trial] * 5
+        mock_create_study.return_value = mock_study
+
+        mock_mlflow.start_run.return_value.__enter__ = MagicMock()
+        mock_mlflow.start_run.return_value.__exit__ = MagicMock()
+
+        run_optuna_search(
+            horizon=7, n_trials=5, timeout=60,
+            output_dir="/tmp/test_resume_skip",
+        )
+
+        # optimize NO debió ser llamado
+        mock_study.optimize.assert_not_called()
+        mock_train.assert_called_once()

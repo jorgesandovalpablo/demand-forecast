@@ -7,6 +7,7 @@ Estrategia agresiva (laptop sin GPU):
   - 600 boosting rounds con early stopping 80
   - Feature engineering caching (una sola vez por study)
   - Ranges diferenciados por horizon (h7: L1, h30: Huber)
+  - Storage SQLite para resume automático (load_if_exists)
 
 Coste estimado: ~10-15 min/trial → 150 trials en ~25-35 horas.
 """
@@ -15,6 +16,7 @@ import numpy as np
 import pandas as pd
 import mlflow
 import optuna
+import optuna.storages
 import joblib
 from pathlib import Path
 from typing import Optional
@@ -195,6 +197,7 @@ def run_optuna_search(
     subsample_ratio = optuna_cfg.get('subsample_ratio', 0.30)
     max_boost_round = optuna_cfg.get('max_boost_round', 600)
     early_stopping_rounds = optuna_cfg.get('early_stopping_rounds', 80)
+    storage_url = optuna_cfg.get('storage')
 
     set_global_seed(config['project']['seed'])
     setup_mlflow()
@@ -249,22 +252,75 @@ def run_optuna_search(
             max_resource=max_boost_round,
             reduction_factor=4,
         )
+
+        # ── Storage SQLite para resume ──
+        storage = None
+        if storage_url:
+            storage = optuna.storages.RDBStorage(url=storage_url)
+
         study = optuna.create_study(
+            study_name=f"lgbm_h{horizon}",
+            storage=storage,
             direction="minimize",
             pruner=pruner,
-            study_name=f"lgbm_h{horizon}",
+            load_if_exists=True,
         )
 
+        # ── Calcular trials restantes (resume support) ──
+        target_trials = n_trials
+        if storage:
+            from optuna.trial import TrialState
+            n_completed = len(study.get_trials(
+                states=(TrialState.COMPLETE,)
+            ))
+            n_pruned = len(study.get_trials(
+                states=(TrialState.PRUNED,)
+            ))
+            remaining = max(0, target_trials - n_completed)
+            logger.info(
+                f"Study existente: {n_completed} completados, "
+                f"{n_pruned} pruned → "
+                f"{remaining} restantes de {target_trials}"
+            )
+        else:
+            remaining = target_trials
+
+        mlflow.log_param("storage", storage_url or "in-memory")
+        mlflow.log_param("target_trials", target_trials)
+        if storage:
+            mlflow.log_param("trials_completed", n_completed)
+            mlflow.log_param("trials_remaining", remaining)
+
+        # ── Optimize con MaxTrialsCallback safety net ──
+        callbacks = []
+        if storage:
+            from optuna.study import MaxTrialsCallback
+            from optuna.trial import TrialState
+            callbacks.append(
+                MaxTrialsCallback(
+                    target_trials,
+                    states=(TrialState.COMPLETE,),
+                )
+            )
+
         logger.info("Iniciando Optuna study...")
-        study.optimize(
-            lambda trial: _objective(
-                trial, df_sub, feature_cols, horizon,
-                n_folds, max_boost_round, early_stopping_rounds,
-            ),
-            n_trials=n_trials,
-            timeout=timeout,
-            show_progress_bar=True,
-        )
+        if remaining > 0:
+            study.optimize(
+                lambda trial: _objective(
+                    trial, df_sub, feature_cols, horizon,
+                    n_folds, max_boost_round,
+                    early_stopping_rounds,
+                ),
+                n_trials=remaining,
+                timeout=timeout,
+                callbacks=callbacks,
+                show_progress_bar=True,
+            )
+        else:
+            logger.info(
+                "Study ya completado. "
+                "Entrenando modelo final con best params."
+            )
 
         best = study.best_trial
         logger.info(f"Best trial #{best.number}: MAE={best.value:.4f}")

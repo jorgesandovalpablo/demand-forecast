@@ -101,7 +101,7 @@ optuna:
   early_stopping_rounds: 80
   direction: "minimize"
   metric: "mae"
-  storage: null
+  storage: "sqlite:///data/optuna_studies.db"
   pruner: "hyperband"
 
 mlflow:
