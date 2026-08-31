@@ -1,19 +1,19 @@
 {
   "folds": [
-    "FoldResult(fold=1, train_start=Timestamp('2014-01-01 00:00:00'), train_end=Timestamp('2017-01-31 00:00:00'), val_start=Timestamp('2017-02-01 00:00:00'), val_end=Timestamp('2017-02-28 00:00:00'), rmse=288.0324, mae=77.466, mape=36.7523, rmsle=0.4885, n_train=np.int64(2002968), n_val=np.int64(49896), wape=16.6246)",
-    "FoldResult(fold=2, train_start=Timestamp('2014-01-01 00:00:00'), train_end=Timestamp('2017-02-28 00:00:00'), val_start=Timestamp('2017-03-01 00:00:00'), val_end=Timestamp('2017-03-28 00:00:00'), rmse=303.3378, mae=74.0336, mape=33.9647, rmsle=0.4158, n_train=np.int64(2052864), n_val=np.int64(49896), wape=15.1623)",
-    "FoldResult(fold=3, train_start=Timestamp('2014-01-01 00:00:00'), train_end=Timestamp('2017-03-28 00:00:00'), val_start=Timestamp('2017-03-29 00:00:00'), val_end=Timestamp('2017-04-25 00:00:00'), rmse=342.2983, mae=73.6096, mape=37.1002, rmsle=0.5091, n_train=np.int64(2102760), n_val=np.int64(49896), wape=15.3526)",
-    "FoldResult(fold=4, train_start=Timestamp('2014-01-01 00:00:00'), train_end=Timestamp('2017-04-25 00:00:00'), val_start=Timestamp('2017-04-26 00:00:00'), val_end=Timestamp('2017-05-23 00:00:00'), rmse=280.019, mae=68.4679, mape=34.4132, rmsle=0.4406, n_train=np.int64(2152656), n_val=np.int64(49896), wape=13.9424)",
-    "FoldResult(fold=5, train_start=Timestamp('2014-01-01 00:00:00'), train_end=Timestamp('2017-05-23 00:00:00'), val_start=Timestamp('2017-05-24 00:00:00'), val_end=Timestamp('2017-06-20 00:00:00'), rmse=291.3345, mae=71.7399, mape=33.8592, rmsle=0.4125, n_train=np.int64(2202552), n_val=np.int64(49896), wape=14.5453)"
+    "FoldResult(fold=1, train_start=Timestamp('2014-01-01 00:00:00'), train_end=Timestamp('2017-01-31 00:00:00'), val_start=Timestamp('2017-02-01 00:00:00'), val_end=Timestamp('2017-02-28 00:00:00'), rmse=275.6631, mae=75.8004, mape=35.8667, rmsle=0.486, n_train=np.int64(2002968), n_val=np.int64(49896), wape=16.2672)",
+    "FoldResult(fold=2, train_start=Timestamp('2014-01-01 00:00:00'), train_end=Timestamp('2017-02-28 00:00:00'), val_start=Timestamp('2017-03-01 00:00:00'), val_end=Timestamp('2017-03-28 00:00:00'), rmse=264.7337, mae=65.3246, mape=33.0243, rmsle=0.3973, n_train=np.int64(2052864), n_val=np.int64(49896), wape=13.3786)",
+    "FoldResult(fold=3, train_start=Timestamp('2014-01-01 00:00:00'), train_end=Timestamp('2017-03-28 00:00:00'), val_start=Timestamp('2017-03-29 00:00:00'), val_end=Timestamp('2017-04-25 00:00:00'), rmse=337.5071, mae=72.7269, mape=36.8833, rmsle=0.5069, n_train=np.int64(2102760), n_val=np.int64(49896), wape=15.1685)",
+    "FoldResult(fold=4, train_start=Timestamp('2014-01-01 00:00:00'), train_end=Timestamp('2017-04-25 00:00:00'), val_start=Timestamp('2017-04-26 00:00:00'), val_end=Timestamp('2017-05-23 00:00:00'), rmse=285.7916, mae=69.1248, mape=34.0259, rmsle=0.4441, n_train=np.int64(2152656), n_val=np.int64(49896), wape=14.0761)",
+    "FoldResult(fold=5, train_start=Timestamp('2014-01-01 00:00:00'), train_end=Timestamp('2017-05-23 00:00:00'), val_start=Timestamp('2017-05-24 00:00:00'), val_end=Timestamp('2017-06-20 00:00:00'), rmse=313.4232, mae=73.3213, mape=34.0277, rmsle=0.4199, n_train=np.int64(2202552), n_val=np.int64(49896), wape=14.8659)"
   ],
-  "rmse_mean": 301.0044,
-  "rmse_std": 21.9672,
-  "mae_mean": 73.0634,
-  "mae_std": 2.9493,
-  "mape_mean": 35.2179,
-  "mape_std": 1.4115,
-  "rmsle_mean": 0.4533,
-  "rmsle_std": 0.0389,
-  "wape_mean": 15.1254,
-  "wape_std": 0.8985
+  "rmse_mean": 295.4237,
+  "rmse_std": 26.5335,
+  "mae_mean": 71.2596,
+  "mae_std": 3.6552,
+  "mape_mean": 34.7656,
+  "mape_std": 1.4015,
+  "rmsle_mean": 0.4508,
+  "rmsle_std": 0.0406,
+  "wape_mean": 14.7513,
+  "wape_std": 0.9824
 }
