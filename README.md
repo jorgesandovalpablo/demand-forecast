@@ -176,7 +176,7 @@ retrain.py
 | **Versionado datos** | DVC | ⚠️ Pendiente — declarado en requirements pero sin uso en src/ |
 | **Dependencias** | pip-tools | Versiones exactas y reproducibles |
 | **Calidad** | Black + Flake8 + isort | Estilo y linting automático |
-| **Tests** | pytest | 63 tests unitarios/de integración (features, API, Model Registry, SHAP, Optuna, train y retrain) |
+| **Tests** | pytest | 73 tests unitarios/de integración (features, API, Model Registry, SHAP, Optuna, train, retrain y baselines) |
 
 ---
 
@@ -211,6 +211,17 @@ retrain.py
 > artefactos vigentes (`lgbm_daily@production v3` / `lgbm_monthly@production v3`
 > en DagsHub). El WAPE alto en MAPE refleja familias esporádicas con muchos
 > ceros; WAPE es la métrica de negocio de referencia.
+
+### Comparación con Baselines
+
+| Modelo | h7 WAPE | h30 WAPE |
+|---|---|---|
+| Naive (último valor) | 26.60% | 26.60% |
+| Seasonal Naive | 25.39% | 29.42% |
+| **LightGBM (Optuna)** | **10.51%** | **12.34%** |
+
+> 📌 El modelo ML reduce el WAPE en **60.5%** (h7) y **53.6%** (h30)
+> respecto al baseline Naive. Detalle completo en `reports/baselines.md`.
 
 <p align="center">
   <img src="notebooks/figures/predictions_h7.png" width="45%" alt="Predicciones h7" />
@@ -300,7 +311,8 @@ demand-forecast/
 │   │   ├── predict.py         # Inferencia + ModelRegistry con caché
 │   │   ├── retrain.py         # Promoción segura: staging → comparación → producción
 │   │   ├── tune.py            # Optuna hyperparameter tuning
-│   │   └── shap_analysis.py   # SHAP explainability
+│   │   ├── shap_analysis.py   # SHAP explainability
+│   │   └── baselines.py       # Naive + Seasonal Naive (comparación)
 │   ├── api/
 │   │   ├── main.py            # FastAPI endpoints
 │   │   └── schemas.py         # Pydantic validation
@@ -316,7 +328,8 @@ demand-forecast/
 │   ├── test_shap.py           # SHAP analysis
 │   ├── test_tune.py           # Optuna tuning
 │   ├── test_retrain.py        # Retrain + params-file propagation
-│   └── test_train.py          # Train defaults
+│   ├── test_train.py          # Train defaults
+│   └── test_baselines.py      # Naive + Seasonal Naive baselines
 │
 ├── logs/                      # Logs operacionales (no versionados)
 ├── .env.example               # Variables de entorno de ejemplo
@@ -690,7 +703,7 @@ contribución media absoluta a las predicciones.
 Última actualización: 2026-08-28.
 
 ### Implementado y verificado
-- Pipeline de features stateful con paridad train/serving testada (63 tests).
+- Pipeline de features stateful con paridad train/serving testada (73 tests).
 - Promoción segura en retraining (staging → comparación → producción con backups).
 - `evaluate.py` reconstruyendo features desde el pipeline serializado.
 - Intervalos de confianza calculados en escala log desde las stats históricas completas.
