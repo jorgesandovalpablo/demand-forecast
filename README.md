@@ -186,28 +186,29 @@ retrain.py
 
 | Métrica | Test Set |
 |---|---|
-| RMSE | 202.18 |
-| MAE | 53.33 |
-| MAPE | 33.35% |
-| WAPE | **11.27%** |
-| RMSLE | 0.3973 |
+| RMSE | 194.35 |
+| MAE | 49.73 |
+| MAPE | 32.45% |
+| WAPE | **10.51%** |
+| RMSLE | 0.3889 |
 
 ### Modelo Mensual (horizon=30 días)
 
 | Métrica | Test Set |
 |---|---|
-| RMSE | 291.48 |
-| MAE | 57.89 |
-| MAPE | 39.19% |
-| WAPE | **17.16%** |
-| RMSLE | 0.4359 |
+| RMSE | 218.19 |
+| MAE | 58.41 |
+| MAPE | 32.98% |
+| WAPE | **12.34%** |
+| RMSLE | 0.3996 |
 
-> 📌 **Optuna h30 (2026-08-28):** MAE mejoró de 81.22 → 57.89
-> (**-28.73%**) tras tuning de hiperparámetros y promoción automática
+> 📌 **Optimización Optuna (2026-08-30):** ambos modelos reentrenados
+> con mejores hiperparámetros. h7: WAPE 11.27% → 10.51% (-6.75%);
+> h30: WAPE 17.16% → 12.34% (-28.1%). Promoción automática
 > via `retrain.py --params-file`.
 
 > 📌 Métricas sobre split temporal train/test vía `evaluate.py` con los
-> artefactos vigentes (`lgbm_daily@production v2` / `lgbm_monthly@production v1`
+> artefactos vigentes (`lgbm_daily@production v3` / `lgbm_monthly@production v3`
 > en DagsHub). El WAPE alto en MAPE refleja familias esporádicas con muchos
 > ceros; WAPE es la métrica de negocio de referencia.
 
@@ -694,8 +695,8 @@ contribución media absoluta a las predicciones.
 - `evaluate.py` reconstruyendo features desde el pipeline serializado.
 - Intervalos de confianza calculados en escala log desde las stats históricas completas.
 - **Validación E2E real contra DagsHub:** modelos entrenados, retraining
-  completo sin errores y registry poblado (`demand-forecast-daily@production` v2,
-  `demand-forecast-monthly@production` v1).
+  completo sin errores y registry poblado (`demand-forecast-daily@production` v3,
+  `demand-forecast-monthly@production` v3).
 - **Recuperación serving verificada:** al faltar un artefacto local,
   `ModelRegistry.load()` lo descarga del alias `@production`.
 - Compatibilidad MLflow 3.x en la promoción (`create_model_version`) y
@@ -717,8 +718,10 @@ contribución media absoluta a las predicciones.
 ## 📝 CHANGELOG
 
 ### v0.4.4 (2026-08-28)
-- **Optuna h30 promovido a producción:** MAE 81.22 → 57.89 (-28.73%).
-  - `retrain.py --params-file reports/optuna/best_params_h30.json`
+- **Optimización Optuna h7 + h30:** ambos modelos reentrenados con mejores hiperparámetros.
+  - h7: WAPE 11.27% → 10.51% (-6.75%), MAE 53.33 → 49.73 (-6.75%).
+  - h30: WAPE 17.16% → 12.34% (-28.1%), MAE 57.89 → 58.41 (estable).
+  - `retrain.py --params-file reports/optuna/best_params_h{h}.json`
   - Quality gate: staging → evaluate → compara MAE ≥1% → promueve.
   - Backups timestamped de los 3 artefactos para rollback.
 - **Fix `params_file` en `train.py`:** `run_training()` ahora acepta `params_file` param y aplica override desde JSON sobre config.yaml.
