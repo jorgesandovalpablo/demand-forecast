@@ -17,6 +17,7 @@ from src.utils.config import config
 
 DATA_PROCESSED = Path("data/processed/train_processed.parquet")
 METRICS_PATTERN = Path("data/predictions/global_metrics_h{horizon}.parquet")
+BACKTEST_PATTERN = Path("data/predictions/backtest_predictions_h{horizon}.parquet")
 HORIZONS = [7, 30]
 
 st.set_page_config(
@@ -49,6 +50,14 @@ def load_assets() -> dict:
             pd.read_parquet(p) if p.exists() else None
         )
 
+    backtest = {}
+    for horizon in HORIZONS:
+        path = BACKTEST_PATTERN.as_posix().format(horizon=horizon)
+        p = Path(path)
+        backtest[horizon] = (
+            pd.read_parquet(p) if p.exists() else None
+        )
+
     for horizon in HORIZONS:
         ModelRegistry.load(horizon)
 
@@ -56,6 +65,7 @@ def load_assets() -> dict:
         "historical": historical,
         "family_map": family_map,
         "metrics": metrics,
+        "backtest": backtest,
         "stores": sorted(historical["store_nbr"].unique().tolist()),
     }
 
@@ -153,6 +163,29 @@ with left:
         st.markdown(f"#### {selected}")
         display = subset.sort_values("date")
         fig = go.Figure()
+
+        bt = assets["backtest"].get(horizon)
+        if bt is not None and not bt.empty:
+            bt_fam = bt[
+                (bt["store_nbr"] == store_nbr) &
+                (bt["family"] == family_code)
+            ].sort_values("date")
+            if not bt_fam.empty:
+                fig.add_trace(
+                    go.Scatter(
+                        x=bt_fam["date"], y=bt_fam["real_sales"],
+                        mode="lines+markers", name="Real (test)",
+                        line=dict(color="#2ca02c", width=2),
+                    )
+                )
+                fig.add_trace(
+                    go.Scatter(
+                        x=bt_fam["date"], y=bt_fam["y_pred_real"],
+                        mode="lines+markers", name="Backtest",
+                        line=dict(color="#ff7f0e", width=2, dash="dash"),
+                    )
+                )
+
         fig.add_trace(
             go.Scatter(
                 x=display["date"], y=display["predicted_sales"],
@@ -175,9 +208,15 @@ with left:
                 name="Intervalo de confianza",
             )
         )
+        fig.add_vline(
+            x=display["date"].min(),
+            line_dash="dot", line_color="gray",
+            annotation_text="Predicción inicia",
+            annotation_position="top left",
+        )
         fig.update_layout(
             height=420, margin=dict(l=0, r=0, t=30, b=0),
-            yaxis_title="Ventas predichas",
+            yaxis_title="Ventas",
             legend=dict(orientation="h", y=1.02),
         )
         st.plotly_chart(fig, width="stretch")
@@ -201,6 +240,62 @@ with left:
         )
         st.plotly_chart(bar, width="stretch")
 
+        st.markdown("#### Series agregadas (todas las familias)")
+        bt = assets["backtest"].get(horizon)
+        if bt is not None and not bt.empty:
+            bt_store = bt[bt["store_nbr"] == store_nbr]
+            bt_daily = (
+                bt_store.groupby("date", as_index=False)[
+                    ["real_sales", "y_pred_real"]
+                ].sum()
+            )
+            fut_daily = (
+                subset.groupby("date", as_index=False)[
+                    ["predicted_sales"]
+                ].sum()
+            )
+            fig_ts = go.Figure()
+            fig_ts.add_trace(
+                go.Scatter(
+                    x=bt_daily["date"], y=bt_daily["real_sales"],
+                    mode="lines+markers", name="Real (test)",
+                    line=dict(color="#2ca02c", width=2),
+                )
+            )
+            fig_ts.add_trace(
+                go.Scatter(
+                    x=bt_daily["date"], y=bt_daily["y_pred_real"],
+                    mode="lines+markers", name="Backtest",
+                    line=dict(color="#ff7f0e", width=2, dash="dash"),
+                )
+            )
+            fig_ts.add_trace(
+                go.Scatter(
+                    x=fut_daily["date"], y=fut_daily["predicted_sales"],
+                    mode="lines+markers", name="Predicción",
+                    line=dict(color="#1f77b4", width=2),
+                )
+            )
+            fig_ts.add_vline(
+                x=fut_daily["date"].min(),
+                line_dash="dot", line_color="gray",
+                annotation_text="Predicción inicia",
+                annotation_position="top left",
+            )
+            fig_ts.update_layout(
+                height=420, margin=dict(l=0, r=0, t=30, b=0),
+                yaxis_title="Ventas (agregado por día)",
+                legend=dict(orientation="h", y=1.02),
+            )
+            st.plotly_chart(fig_ts, width="stretch")
+        else:
+            st.info(
+                "No se encontró `data/predictions/"
+                "backtest_predictions_h{horizon}.parquet`. "
+                "Ejecuta `src/models/evaluate.py "
+                "--horizon {horizon}` para generar la comparación."
+            )
+
 with right:
     st.markdown("#### Detalle")
     detail = subset[["date", "family_name", "predicted_sales",
@@ -216,8 +311,11 @@ with right:
 
 st.divider()
 st.caption(
-    "Intervalos de confianza del 95% calculados en escala log a partir de "
-    "la desviación histórica de cada tienda-familia. "
+    "La ventana de 8 semanas previa a la predicción corresponde al test set "
+    "de `evaluate.py`: se muestran las ventas reales y la predicción backtest "
+    "del modelo sobre ese mismo periodo. "
+    "Los intervalos de confianza del 95% se calculan en escala log a partir "
+    "de la desviación histórica de cada tienda-familia. "
     "La predicción es determinística dado el historial; "
     "los resultados se cachean por tienda y horizonte."
 )
