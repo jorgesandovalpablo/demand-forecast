@@ -330,3 +330,62 @@ class TestOilFeaturesDateAligned:
         nonnull = out.dropna(subset=["oil_lag_7"])
         nunique = nonnull.groupby(["store_nbr", "date"])["oil_lag_7"].nunique()
         assert (nunique == 1).all()
+
+
+class TestFeatureIntegrity:
+    """Integridad del pipeline: cardinalidad y paridad train/serving."""
+
+    def test_no_row_fanout_after_merge(self, fitted_pipeline):
+        """Los merges (stateful + store-level) no deben duplicar ni perder filas.
+
+        El merge de transacciones/oil se hace sobre (store_nbr, date) único en
+        `uniq`; si la clave dejara de ser única, habría fan-out (más de
+        n_families filas por (store, date)) o pérdida de series.
+        """
+        fe, df = fitted_pipeline
+        out = fe.transform(df, is_train=False)
+
+        n_families = df["family"].nunique()
+        assert len(out) == len(df), "El transform altera el número de filas"
+        counts = out.groupby(["store_nbr", "date"])["family"].nunique()
+        assert (counts == n_families).all(), (
+            f"Fan-out detectado: se esperan {n_families} familias por (store, date)"
+        )
+        assert not out.duplicated(
+            subset=["store_nbr", "date", "family"]
+        ).any(), "Existen filas duplicadas por (store, date, family)"
+
+    def test_is_train_parity_feature_values(self, fitted_pipeline):
+        """Los features son idénticos con is_train=True y False (misma entrada).
+
+        La única diferencia permitida es que is_train=True elimina las filas
+        con lags nulos (dropna). Sobre las filas compartidas, los valores de
+        TODOS los features deben coincidir exactamente (garantía de paridad).
+        """
+        fe, df = fitted_pipeline
+        out_train = fe.transform(df, is_train=True)
+        out_serving = fe.transform(df, is_train=False)
+
+        keys = ["store_nbr", "family", "date"]
+        feat_cols = [c for c in out_train.columns if c not in keys + ["sales"]]
+
+        merged = out_train[keys + feat_cols].merge(
+            out_serving[keys + feat_cols], on=keys, suffixes=("_t", "_s")
+        )
+        assert len(merged) == len(out_train), (
+            "Filas de train no encuentan su par en serving"
+        )
+
+        for c in feat_cols:
+            a = merged[f"{c}_t"]
+            b = merged[f"{c}_s"]
+            if a.dtype == "category":
+                # Las categoricals (p. ej. holiday_impact_type) se comparan
+                # por código de categoría (mismo vocabulario en train y serving).
+                assert (a.cat.codes.fillna(-1) == b.cat.codes.fillna(-1)).all(), (
+                    f"Feature '{c}' difiere entre train y serving"
+                )
+            else:
+                assert (a.fillna(-999) == b.fillna(-999)).all(), (
+                    f"Feature '{c}' difiere entre train y serving"
+                )
