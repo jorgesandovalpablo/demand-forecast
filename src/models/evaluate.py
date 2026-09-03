@@ -17,6 +17,78 @@ logger = get_logger(__name__)
 
 
 # ─────────────────────────────────────────
+# 0. Backtest (predicciones del test set)
+# ─────────────────────────────────────────
+def build_backtest_df(
+    test_df: pd.DataFrame,
+    y_pred: np.ndarray,
+    target: str
+) -> pd.DataFrame:
+    """
+    Construye el DataFrame de predicciones del test set (backtest).
+
+    Los valores se guardan en escala real: ventas reales y predicción
+    (expm1). Adicionalmente se persiste `y_pred_log` para poder calcular
+    el intervalo de confianza en el dashboard sin re-ejecutar evaluate.
+
+    Parámetros:
+        test_df: DataFrame del test set (contiene date, store_nbr, family
+                 y el target en escala log).
+        y_pred: predicción del modelo en escala log, alineada con test_df.
+        target: nombre de la columna objetivo en escala log.
+
+    Retorna:
+        DataFrame con columnas
+        [date, store_nbr, family, real_sales, y_pred_real, y_pred_log].
+    """
+    backtest = test_df[['date', 'store_nbr', 'family']].copy()
+    backtest['real_sales'] = np.clip(
+        np.expm1(test_df[target].values), 0, None
+    )
+    backtest['y_pred_real'] = np.clip(np.expm1(y_pred), 0, None)
+    backtest['y_pred_log'] = y_pred
+    return backtest
+
+
+def compute_residual_std(
+    backtest_df: pd.DataFrame
+) -> dict:
+    """
+    Estima la desviación estándar del error residual del modelo en escala
+    log, a partir de las predicciones del test set (backtest).
+
+    Se usa como ancho del intervalo de confianza en predict: refleja la
+    incertidumbre real del modelo, no la volatilidad histórica de ventas.
+
+    Parámetros:
+        backtest_df: DataFrame con columnas [store_nbr, family,
+                     y_pred_log, real_sales].
+
+    Retorna:
+        dict con 'global' (float) y 'df' (DataFrame con columnas
+        [store_nbr, family, resid_std]), listo para persistir.
+    """
+    resid = (
+        backtest_df['y_pred_log'].values -
+        np.log1p(backtest_df['real_sales'].values)
+    )
+    global_std = float(np.std(resid))
+
+    per_group = (
+        backtest_df[['store_nbr', 'family', 'y_pred_log']]
+        .assign(resid=resid)
+        .groupby(['store_nbr', 'family'])['resid']
+        .std()
+        .dropna()
+        .reset_index()
+        .rename(columns={'resid': 'resid_std'})
+    )
+    per_group['resid_std'] = per_group['resid_std'].astype(float)
+
+    return {'global': global_std, 'df': per_group}
+
+
+# ─────────────────────────────────────────
 # 1. Preparar test set
 # ─────────────────────────────────────────
 def prepare_test_set(
@@ -532,6 +604,34 @@ def run_evaluation(horizon: int, run_shap: bool = False) -> dict:
             f"data/predictions/"
             f"store_metrics_h{horizon}.parquet",
             index=False
+        )
+
+        # Guardar predicciones del test set (backtest) para el dashboard.
+        # y_pred_log se persiste para habilitar el intervalo de confianza
+        # sin re-ejecutar evaluate.
+        target = config['data']['target']
+        backtest = build_backtest_df(test_df, y_pred, target)
+        backtest.to_parquet(
+            f"data/predictions/"
+            f"backtest_predictions_h{horizon}.parquet",
+            index=False
+        )
+        mlflow.log_artifact(
+            f"data/predictions/"
+            f"backtest_predictions_h{horizon}.parquet"
+        )
+
+        # Persistir el σ del error residual (escala log) para que predict
+        # construya intervalos de confianza estrechos y centrados.
+        residual_std = compute_residual_std(backtest)
+        residual_path = Path(
+            f"models/residual_std_h{horizon}.pkl"
+        )
+        joblib.dump(residual_std, residual_path)
+        mlflow.log_artifact(str(residual_path))
+        logger.info(
+            f"σ residual (global) = {residual_std['global']:.4f} | "
+            f"grupos con std: {len(residual_std['df'])}"
         )
 
     logger.info("=" * 50)
