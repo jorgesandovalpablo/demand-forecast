@@ -1,0 +1,12 @@
+# Dependencias del dashboard Streamlit + camino de predicción (src/)
+streamlit>=1.37
+plotly>=5.22
+pandas>=2.0
+numpy
+pyarrow
+joblib
+pyyaml
+lightgbm
+mlflow
+python-dotenv
+scikit-learn
