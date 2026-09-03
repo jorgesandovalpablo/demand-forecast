@@ -762,6 +762,25 @@ contribución media absoluta a las predicciones.
 
 ## 📝 CHANGELOG
 
+### v0.6.0 (2026-09-03)
+- **Ventana backtest en el dashboard:** `evaluate.py` persiste
+  `data/predictions/backtest_predictions_h{h}.parquet` con
+  `(date, store_nbr, family, real_sales, y_pred_real, y_pred_log)` de las
+  últimas 8 semanas (test set). `dashboard/app.py` grafica Real (test) +
+  predicción backtest junto a la predicción futura, tanto por familia como
+  en la vista agregada "(Todas las familias)". Tests en
+  `tests/test_evaluate_backtest.py` y `tests/test_dashboard.py`.
+- **Fix intervalo de confianza (li/ls) del dashboard:** la banda ahora usa la
+  **desviación estándar de los residuos reales** por store/familia
+  (`compute_residual_std` → `models/residual_std_h{h}.pkl`) en vez de la
+  volatilidad histórica (`venta_std_historica`), y `upper_factor` es simétrico
+  (1.0, antes 1.5). Ejemplo tienda 1 GROCERY: `[970, 3179, 18851]` →
+  `[2326, 3044, 3983]` (ls/pred 5.9 → 1.31, li/pred 0.31 → 0.76). El intervalo
+  se construye en escala log y se revierte con `expm1` (multiplicativo en
+  escala real); sigue siendo exclusivo de `predict.py` (`evaluate.py` no
+  genera intervalos).
+- Config version `0.4.6 → 0.6.0`.
+
 ### v0.5.0 (2026-09-01)
 - **Demo interactiva en HuggingFace Spaces:** nuevo `dashboard/app.py`
   (Streamlit) con KPIs por horizonte, predicciones por tienda/familia con
