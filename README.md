@@ -11,6 +11,8 @@
 ![FastAPI](https://img.shields.io/badge/api-FastAPI-teal)
 ![MLflow](https://img.shields.io/badge/tracking-MLflow-orange)
 ![Docker](https://img.shields.io/badge/deploy-Docker-blue)
+![Streamlit](https://img.shields.io/badge/demo-Streamlit-red)
+[![HuggingFace](https://img.shields.io/badge/Demo-vivo-yellow?logo=huggingface&logoColor=white)](<SPACE_URL>)
 
 ---
 
@@ -21,6 +23,7 @@
 - [Arquitectura del pipeline](#-arquitectura-del-pipeline)
 - [Stack tecnológico](#-stack-tecnológico)
 - [Resultados](#-resultados)
+- [Demo en vivo](#-demo-en-vivo)
 - [Estructura del proyecto](#-estructura-del-proyecto)
 - [Reproducir el proyecto](#-reproducir-el-proyecto)
 - [API](#-api)
@@ -268,6 +271,27 @@ Las familias con alto porcentaje de ceros presentan mayor error:
 
 ---
 
+## 🖥️ Demo en vivo
+
+Explora el modelo de forma interactiva: selecciona tienda, horizonte y familia
+para ver predicciones con intervalos de confianza, métricas del modelo y
+gráficos dinámicos.
+
+[![Abrir demo](https://img.shields.io/badge/Abrir%20Demo-HuggingFace-yellow?logo=huggingface&logoColor=white)](<SPACE_URL>)
+
+> El dashboard importa directamente la librería de predicción del pipeline
+> (`src/models/predict.py`), garantizando que lo que ves es exactamente el
+> modelo que sirve la API. Correrlo en local:
+
+```bash
+pip install -r dashboard/requirements.txt
+streamlit run dashboard/app.py
+```
+
+> Para reproducir el Space: `scripts/sync_hf_space.sh`.
+
+---
+
 ## 📁 Estructura del proyecto
 
 ```
@@ -280,6 +304,14 @@ demand-forecast/
 │
 ├── configs/
 │   └── config.yaml              # Fuente de verdad única del proyecto
+│
+├── dashboard/
+│   ├── app.py                   # Demo Streamlit (KPIs + gráficos + predicción)
+│   ├── requirements.txt         # Dependencias del dashboard
+│   └── README.md                # Guía del Space de HuggingFace
+│
+├── scripts/
+│   └── sync_hf_space.sh         # Publica el dashboard + artefactos al Space
 │
 ├── data/
 │   ├── raw/                     # CSV originales — nunca se modifican
@@ -729,6 +761,28 @@ contribución media absoluta a las predicciones.
 ---
 
 ## 📝 CHANGELOG
+
+### v0.5.0 (2026-09-01)
+- **Demo interactiva en HuggingFace Spaces:** nuevo `dashboard/app.py`
+  (Streamlit) con KPIs por horizonte, predicciones por tienda/familia con
+  intervalos de confianza y gráficos interactivos (Plotly). Reutiliza
+  `predict_by_store` → paridad total con la API.
+- **Cache predict:** `_load_raw_predict_cached()` en `predict.py` evita
+  releer los CSVs estáticos en cada llamada (4 CSVs). Predicción ~0.3-0.4s.
+- **`scripts/sync_hf_space.sh`:** prepara y empuja código + artefactos al
+  Space (modelos/datos versionados con git LFS, sin secretos).
+- **KPIs con métricas globales reales:** `evaluate.py` persiste
+  `global_metrics_h{h}.parquet`; el dashboard muestra el WAPE global de
+  test (10.51% / 12.34%) en vez del promedio por familia (antes 33.32%).
+- **Fix intervalo de confianza:** nuevo helper `_build_confidence_intervals`
+  en `predict.py` garantiza `upper >= lower >= 0` (antes `upper_bound` podía
+  ser negativo en familias esporádicas). 5 tests nuevos.
+- **Fix feature de transacciones (causa raíz del colapso de predicción):**
+  `_build_transaction_features` alinea por fecha (serie store-level con
+  `shift(horizon)` en días reales) en vez de posicional. Evita que
+  `trans_lag_{h}`/`trans_rolling_mean_{h}` colapsen a 0 en la frontera
+  futura (dataset termina 2017-08-15). **Requiere retrain h7/h30** para
+  aplicar las features corregidas en producción.
 
 ### v0.4.4 (2026-08-28)
 - **Optimización Optuna h7 + h30:** ambos modelos reentrenados con mejores hiperparámetros.
