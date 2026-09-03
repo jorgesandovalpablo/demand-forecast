@@ -46,6 +46,7 @@ class ModelRegistry:
     _models: dict = {}
     _features: dict = {}
     _pipelines: dict = {}
+    _std: dict = {}
 
     @classmethod
     def load(cls, horizon: int) -> object:
@@ -95,12 +96,59 @@ class ModelRegistry:
             cls._models[horizon] = joblib.load(model_path)
             cls._features[horizon] = joblib.load(features_path)
             cls._pipelines[horizon] = joblib.load(pipeline_path)
+            cls._load_residual_std(horizon, pipeline_path)
             logger.info(
                 f"Modelo horizon={horizon} cargado |"
                 f"Features: {len(cls._features[horizon])}"
             )
 
         return cls._models[horizon]
+
+    @classmethod
+    def _load_residual_std(
+        cls, horizon: int, pipeline_path: Path
+    ) -> None:
+        """
+        Carga el σ del error residual (escala log) persistido por evaluate.
+
+        Si el archivo no existe, usa como fallback el σ de la volatilidad
+        histórica del pipeline (store_stats.venta_std_historica), con el
+        mismo formato {'global', 'df'}.
+        """
+        std_path = Path(f"models/residual_std_h{horizon}.pkl")
+        if std_path.exists():
+            cls._std[horizon] = joblib.load(std_path)
+            logger.info(
+                f"σ residual cargado: global="
+                f"{cls._std[horizon].get('global', 0.0):.4f}"
+            )
+            return
+
+        logger.warning(
+            f"models/residual_std_h{horizon}.pkl no encontrado; "
+            f"usando σ histórico del pipeline como fallback."
+        )
+        pipeline = joblib.load(pipeline_path)
+        std_by_group = pipeline.store_stats[
+            ['store_nbr', 'family', 'venta_std_historica']
+        ].rename(columns={'venta_std_historica': 'resid_std'})
+        if 'family' in pipeline.categories_mapping:
+            cats = pipeline.categories_mapping['family']
+            std_by_group['family'] = (
+                pd.Categorical(std_by_group['family'], categories=cats)
+                .codes.astype('int16')
+            )
+        cls._std[horizon] = {
+            'global': float(std_by_group['resid_std'].mean()),
+            'df': std_by_group.reset_index(drop=True),
+        }
+
+    @classmethod
+    def get_residual_std(cls, horizon: int) -> dict:
+        """Retorna el σ residual (o fallback) del horizonte."""
+        if horizon not in cls._std:
+            cls.load(horizon)
+        return cls._std[horizon]
 
     @classmethod
     def get_features(cls, horizon: int) -> list:
@@ -123,6 +171,7 @@ class ModelRegistry:
         cls._models = {}
         cls._features = {}
         cls._pipelines = {}
+        cls._std = {}
         logger.info("Caché de modelos limpiado")
 
 
@@ -197,7 +246,7 @@ def _build_confidence_intervals(
     y_pred_log: np.ndarray,
     std_sales: np.ndarray,
     z: float = 1.96,
-    upper_factor: float = 1.5
+    upper_factor: float = 1.0
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Construye los intervalos de confianza en escala real.
@@ -207,11 +256,16 @@ def _build_confidence_intervals(
     upper_bound nunca quede por debajo de lower_bound (las familias
     esporádicas con predicción ~0 producían upper_bound negativo).
 
+    El ancho usa el σ del error residual del modelo (persistido por
+    evaluate). `upper_factor` por defecto es 1.0 → intervalo simétrico
+    en escala log, lo que evita que el punto quede pegado al límite
+    inferior en escala real.
+
     Parámetros:
         y_pred_log:  predicción del modelo en escala log
-        std_sales:   desviación histórica por tienda-familia (escala log)
+        std_sales:   desviación del error residual (escala log)
         z:           multiplicador del cuantil (1.96 ≈ 95%)
-        upper_factor: factor que amplía el extremo superior
+        upper_factor: factor que amplía el extremo superior (1.0 = simétrico)
 
     Retorna:
         tuple: (lower_bound, upper_bound) redondeados a 2 decimales
@@ -304,18 +358,16 @@ def predict(
     y_pred_real = np.expm1(y_pred_log)
     y_pred_real = np.clip(y_pred_real, 0, None)
 
-    # Intervalo de confianza basado en la desviación
-    # histórica completa aprendida en fit() (escala log).
-    std_by_group = pipeline.store_stats[
-        ['store_nbr', 'family', 'venta_std_historica']
-    ].rename(columns={'venta_std_historica': 'std_sales'})
-
-    if 'family' in pipeline.categories_mapping:
-        cats = pipeline.categories_mapping['family']
-        std_by_group['family'] = (
-            pd.Categorical(std_by_group['family'], categories=cats)
-            .codes.astype('int16')
-        )
+    # Intervalo de confianza basado en el σ del error residual del modelo
+    # (persistido por evaluate). Si falta, get_residual_std usa el σ
+    # histórico del pipeline como fallback. Cualquier (store, family) sin
+    # σ residual usa el global.
+    residual_std = ModelRegistry.get_residual_std(horizon)
+    std_by_group = residual_std['df'].copy()
+    std_by_group = std_by_group.rename(
+        columns={'resid_std': 'std_sales'}
+    )
+    global_std = float(residual_std.get('global', 0.0))
 
     results = prediction_df[
         ['date', 'store_nbr', 'family']
@@ -329,6 +381,7 @@ def predict(
         on=['store_nbr', 'family'],
         how='left'
     )
+    results['std_sales'] = results['std_sales'].fillna(global_std)
 
     # Cuantiles en escala log y luego revertir log1p
     lower_bound, upper_bound = _build_confidence_intervals(

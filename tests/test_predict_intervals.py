@@ -49,6 +49,18 @@ def test_upper_respeto_lower_explícito() -> None:
     assert lower[0] == 0.0 and upper[0] == 0.0
 
 
+def test_simetrico_por_defecto() -> None:
+    """Por defecto (upper_factor=1.0) el intervalo es simétrico en log."""
+    mu = np.log1p(100.0)
+    std = np.array([0.5])
+    lower, upper = _build_confidence_intervals(np.array([mu]), std)
+    # En log, la distancia del punto a cada extremo debe ser la misma.
+    d_low = mu - np.log1p(lower[0])
+    d_up = np.log1p(upper[0]) - mu
+    # Tolerancia por el redondeo a 2 decimales interno de la función.
+    np.testing.assert_allclose(d_low, d_up, atol=0.01)
+
+
 @pytest.mark.skipif(
     not Path("models/lgbm_h7.pkl").exists(),
     reason="Artefactos de modelo no presentes",
