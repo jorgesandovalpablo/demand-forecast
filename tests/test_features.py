@@ -42,6 +42,13 @@ def make_synthetic_df(n_days: int = 90, n_stores: int = 2, n_families: int = 2) 
 
     rows = []
     rng = np.random.default_rng(42)
+    # Transacciones son por TIENDA (una serie por store, compartida entre
+    # familias) — refleja el esquema real donde todas las familias de un
+    # (store, date) comparten el mismo valor de 'transactions'.
+    store_transactions = {
+        store: rng.integers(100, 500, n_days)
+        for store in stores
+    }
     for store in stores:
         for fam_idx, family in enumerate(families):
             base = 10.0 * store + 5.0 * fam_idx
@@ -60,7 +67,7 @@ def make_synthetic_df(n_days: int = 90, n_stores: int = 2, n_families: int = 2) 
                 "transferred": False,
                 "dcoilwtico": 50.0,
                 "onpromotion": rng.integers(0, 5, n_days),
-                "transactions": rng.integers(100, 500, n_days),
+                "transactions": store_transactions[store],
             }))
 
     return pd.concat(rows, ignore_index=True)
@@ -178,3 +185,148 @@ class TestTransformParity:
         fe, df = fitted_pipeline
         out = fe.transform(df, is_train=False)
         assert "dcoilwtico" not in out.columns
+
+
+def _make_future_rows(df: pd.DataFrame, n_days: int = 7) -> pd.DataFrame:
+    """Filas futuras (frontera de datos): transactions=0 y sales=0.
+
+    Simula la ventana de predicción donde ya no existen transacciones
+    reales (el dataset termina en df['date'].max()).
+    """
+    stores = df["store_nbr"].unique()
+    families = df["family"].unique()
+    future_dates = pd.date_range(
+        df["date"].max() + pd.Timedelta(days=1), periods=n_days, freq="D"
+    )
+    rows = []
+    for store in stores:
+        for family in families:
+            rows.append(pd.DataFrame({
+                "date": future_dates,
+                "store_nbr": store,
+                "family": family,
+                "sales": 0.0,
+                "city": "Quito",
+                "state": "Pichincha",
+                "type": "A",
+                "cluster": 1,
+                "holiday_type": "No_Holiday",
+                "holiday_description": "No_Holiday",
+                "transferred": False,
+                "dcoilwtico": 50.0,
+                "onpromotion": 0,
+                "transactions": 0.0,
+            }))
+    return pd.concat(rows, ignore_index=True)
+
+
+class TestTransactionFeaturesDateAligned:
+    """Regresión: las features de transacciones deben estar alineadas por fecha.
+
+    Antes se calculaban con shift() posicional sobre el df completo, donde hay
+    33 filas por (store_nbr, date) → retrocedían ~1 día en lugar del horizonte
+    real. Esto colapsaba a 0 en la frontera futura y rompía la predicción.
+    """
+
+    def test_transaction_lag_is_date_aligned(self):
+        """trans_lag_h de (store, D) == transactions de (store, D-h días)."""
+        df = make_synthetic_df()
+        fe = DemandFeatureEngineer(horizon=7)
+        fe.fit(df)
+        out = fe.transform(df, is_train=False)
+
+        store = df["store_nbr"].iloc[0]
+        fam_code = 0
+        d = df["date"].max() - pd.Timedelta(days=10)
+        expected = df[
+            (df["store_nbr"] == store) & (df["date"] == d - pd.Timedelta(days=7))
+        ]["transactions"].iloc[0]
+        got = out[
+            (out["store_nbr"] == store)
+            & (out["family"] == fam_code)
+            & (out["date"] == d)
+        ]["trans_lag_7"].iloc[0]
+        assert np.isclose(got, expected)
+
+    def test_transaction_lag_does_not_collapse_at_future_boundary(self):
+        """En la frontera futura trans_lag_h NO debe colapsar a 0.
+
+        Debe igualar las transacciones reales de hace `horizon` días.
+        """
+        df = make_synthetic_df()
+        fe = DemandFeatureEngineer(horizon=7)
+        fe.fit(df)
+        combined = pd.concat(
+            [df, _make_future_rows(df, 7)], ignore_index=True
+        )
+        out = fe.transform(combined, is_train=False)
+
+        future_start = df["date"].max() + pd.Timedelta(days=1)
+        future_rows = out[out["date"] >= future_start]
+        assert len(future_rows) > 0
+        assert future_rows["trans_lag_7"].notna().all()
+        assert (future_rows["trans_lag_7"] > 0).all()
+
+    def test_transaction_features_are_store_level(self):
+        """Todas las familias de un mismo (store, date) comparten el mismo lag."""
+        df = make_synthetic_df()
+        fe = DemandFeatureEngineer(horizon=7)
+        fe.fit(df)
+        out = fe.transform(df, is_train=False)
+        nonnull = out.dropna(subset=["trans_lag_7"])
+        nunique = nonnull.groupby(["store_nbr", "date"])["trans_lag_7"].nunique()
+        assert (nunique == 1).all()
+
+
+class TestOilFeaturesDateAligned:
+    """Regresión: las features de petróleo deben estar alineadas por fecha.
+
+    Antes se calculaban con shift() posicional sobre el df completo (33 filas
+    por store/date), retrocediendo ~0.2 días en vez del lag real. Ahora se
+    deduplica a serie store-level antes de shift.
+    """
+
+    def test_oil_lag_is_date_aligned(self):
+        """oil_lag_h de (store, D) == dcoilwtico de (store, D-h días)."""
+        df = make_synthetic_df()
+        fe = DemandFeatureEngineer(horizon=7)
+        fe.fit(df)
+        out = fe.transform(df, is_train=False)
+
+        store = df["store_nbr"].iloc[0]
+        d = df["date"].max() - pd.Timedelta(days=10)
+        expected = df[
+            (df["store_nbr"] == store) & (df["date"] == d - pd.Timedelta(days=7))
+        ]["dcoilwtico"].iloc[0]
+        got = out[
+            (out["store_nbr"] == store)
+            & (out["family"] == 0)
+            & (out["date"] == d)
+        ]["oil_lag_7"].iloc[0]
+        assert np.isclose(got, expected)
+
+    def test_oil_lag_does_not_collapse_at_future_boundary(self):
+        """En la frontera futura oil_lag_h NO debe colapsar a 0."""
+        df = make_synthetic_df()
+        fe = DemandFeatureEngineer(horizon=7)
+        fe.fit(df)
+        combined = pd.concat(
+            [df, _make_future_rows(df, 7)], ignore_index=True
+        )
+        out = fe.transform(combined, is_train=False)
+
+        future_start = df["date"].max() + pd.Timedelta(days=1)
+        future_rows = out[out["date"] >= future_start]
+        assert len(future_rows) > 0
+        assert future_rows["oil_lag_7"].notna().all()
+        assert (future_rows["oil_lag_7"] > 0).all()
+
+    def test_oil_features_are_store_level(self):
+        """Todas las familias de un mismo (store, date) comparten el mismo oil_lag."""
+        df = make_synthetic_df()
+        fe = DemandFeatureEngineer(horizon=7)
+        fe.fit(df)
+        out = fe.transform(df, is_train=False)
+        nonnull = out.dropna(subset=["oil_lag_7"])
+        nunique = nonnull.groupby(["store_nbr", "date"])["oil_lag_7"].nunique()
+        assert (nunique == 1).all()

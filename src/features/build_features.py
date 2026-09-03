@@ -228,21 +228,46 @@ class DemandFeatureEngineer:
         logger.info("  Construyendo features de oil...")
         lags = self._select_windows_lag()
         rolls = self._select_windows_rolling()
-        df = df.sort_values('date')
+
+        # dcoilwtico es global (mismo valor por fecha para todas las
+        # tiendas/familias), pero el df tiene 33 filas por (store, date).
+        # Un shift() posicional sobre el df completo retrocedería ~0.2 días
+        # en vez de lag días reales. Se deduplica a serie store-level única
+        # donde shift(lag) == lag días reales, y se mapea de vuelta.
+        uniq = (
+            df[['store_nbr', 'date', 'dcoilwtico']]
+            .drop_duplicates(['store_nbr', 'date'])
+            .sort_values(['store_nbr', 'date'])
+            .copy()
+        )
 
         for lag in lags:
-            df[f'oil_lag_{lag}'] = (
-                df.groupby('store_nbr', observed=True)['dcoilwtico']
+            uniq[f'oil_lag_{lag}'] = (
+                uniq.groupby('store_nbr', observed=True)['dcoilwtico']
                 .shift(lag)
                 .astype('float32')
             )
 
         for w in rolls:
-            df[f'oil_rolling_mean_{w}'] = (
-                df.groupby('store_nbr', observed=True)['dcoilwtico']
-                .transform(lambda x: x.shift(self.horizon).rolling(w, min_periods=1).mean())
+            uniq[f'oil_rolling_mean_{w}'] = (
+                uniq.groupby('store_nbr', observed=True)['dcoilwtico']
+                .transform(
+                    lambda x: x.shift(self.horizon)
+                    .rolling(w, min_periods=1)
+                    .mean()
+                )
                 .astype('float32')
             )
+
+        oil_cols = (
+            [f'oil_lag_{lag}' for lag in lags]
+            + [f'oil_rolling_mean_{w}' for w in rolls]
+        )
+        df = df.merge(
+            uniq[['store_nbr', 'date'] + oil_cols],
+            on=['store_nbr', 'date'],
+            how='left',
+        )
         return df
 
     def _build_promo_features(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -266,17 +291,43 @@ class DemandFeatureEngineer:
     def _build_transaction_features(self, df: pd.DataFrame) -> pd.DataFrame:
         logger.info("  Construyendo features de transacciones...")
         df = df.sort_values(['store_nbr', 'date'])
-        
-        df[f'trans_lag_{self.horizon}'] = (
-            df.groupby('store_nbr', observed=True)['transactions']
+
+        # Las transacciones son por (tienda, fecha), no por familia: hay 33
+        # filas por (store_nbr, date) con el mismo valor de 'transactions'.
+        # Un shift() posicional sobre el df completo por store_nbr retrocedía
+        # ~1 día por cada 33 filas, NO el horizonte en días. Para que el lag y
+        # el rolling estén alineados por fecha se opera sobre la serie única
+        # (store, date), donde shift(horizon) == horizonte días reales, y luego
+        # se mapea el valor de vuelta a cada fila.
+        uniq = (
+            df[['store_nbr', 'date', 'transactions']]
+            .drop_duplicates(['store_nbr', 'date'])
+            .sort_values(['store_nbr', 'date'])
+            .copy()
+        )
+        uniq['trans_lag'] = (
+            uniq.groupby('store_nbr', observed=True)['transactions']
             .shift(self.horizon)
             .astype('float32')
         )
-        df[f'trans_rolling_mean_{self.horizon}'] = (
-            df.groupby('store_nbr', observed=True)['transactions']
-            .transform(lambda x: x.shift(self.horizon).rolling(self.horizon, min_periods=1).mean())
+        uniq['trans_rolling_mean'] = (
+            uniq.groupby('store_nbr', observed=True)['transactions']
+            .transform(
+                lambda x: x.shift(self.horizon)
+                .rolling(self.horizon, min_periods=1)
+                .mean()
+            )
             .astype('float32')
         )
+
+        df = df.merge(
+            uniq[['store_nbr', 'date', 'trans_lag', 'trans_rolling_mean']],
+            on=['store_nbr', 'date'],
+            how='left',
+        )
+        df[f'trans_lag_{self.horizon}'] = df['trans_lag']
+        df[f'trans_rolling_mean_{self.horizon}'] = df['trans_rolling_mean']
+        df = df.drop(columns=['trans_lag', 'trans_rolling_mean'])
         return df
 
     def save(self, filepath: Path):
