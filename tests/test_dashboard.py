@@ -4,7 +4,6 @@
 Requiere los artefactos (modelos, histórico y parquet de backtest) y
 `streamlit.testing.v1.AppTest`. Se saltan si faltan los artefactos.
 """
-import pandas as pd
 import pytest
 from pathlib import Path
 
