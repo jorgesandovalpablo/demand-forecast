@@ -523,6 +523,11 @@ def run_evaluation(horizon: int, run_shap: bool = False) -> dict:
             f"family_metrics_h{horizon}.parquet",
             index=False
         )
+        pd.DataFrame([global_metrics]).to_parquet(
+            f"data/predictions/"
+            f"global_metrics_h{horizon}.parquet",
+            index=False
+        )
         store_metrics.to_parquet(
             f"data/predictions/"
             f"store_metrics_h{horizon}.parquet",
