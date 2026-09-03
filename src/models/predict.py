@@ -11,6 +11,30 @@ logger = get_logger(__name__)
 
 
 # ─────────────────────────────────────────
+# 0. Cache de datos raw (predict=True)
+# ─────────────────────────────────────────
+_RAW_PREDICT_CACHE: dict = {}
+
+
+def _load_raw_predict_cached() -> dict:
+    """
+    Carga los datos raw para el modo predict=True con cache.
+
+    Los CSVs de apoyo (stores, oil, holidays, transactions) son
+    estáticos y determinísticos, así que leerlos en cada llamada es
+    trabajo repetido. Se cargan una única vez y se reutilizan.
+
+    Se retorna un dict nuevo (shallow copy) referenciando los mismos
+    DataFrames cacheados; los DataFrames subyacentes nunca se mutan
+    durante el merge, por lo que es seguro compartirlos entre llamadas.
+    """
+    if '_raw' not in _RAW_PREDICT_CACHE:
+        logger.info("Cargando datos raw (predict=True) por primera vez...")
+        _RAW_PREDICT_CACHE['_raw'] = load_raw_data(predict=True)
+    return dict(_RAW_PREDICT_CACHE['_raw'])
+
+
+# ─────────────────────────────────────────
 # 1. Carga del modelo
 # ─────────────────────────────────────────
 class ModelRegistry:
@@ -145,7 +169,7 @@ def prepare_prediction_data(
     # se inicializa en 0
     future_df[config['data']['target']] = 0.0
 
-    data = load_raw_data(predict=True)
+    data = _load_raw_predict_cached()
     data['test'] = future_df
     _, test = run_preprocessing(data, save=False, predict=True)
 
@@ -169,6 +193,38 @@ def prepare_prediction_data(
 # ─────────────────────────────────────────
 # 3. Predicción principal
 # ─────────────────────────────────────────
+def _build_confidence_intervals(
+    y_pred_log: np.ndarray,
+    std_sales: np.ndarray,
+    z: float = 1.96,
+    upper_factor: float = 1.5
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Construye los intervalos de confianza en escala real.
+
+    Los cuantiles se calculan en escala log y se revierten con
+    expm1. Ambos extremos se recortan a >= 0 y se garantiza que
+    upper_bound nunca quede por debajo de lower_bound (las familias
+    esporádicas con predicción ~0 producían upper_bound negativo).
+
+    Parámetros:
+        y_pred_log:  predicción del modelo en escala log
+        std_sales:   desviación histórica por tienda-familia (escala log)
+        z:           multiplicador del cuantil (1.96 ≈ 95%)
+        upper_factor: factor que amplía el extremo superior
+
+    Retorna:
+        tuple: (lower_bound, upper_bound) redondeados a 2 decimales
+    """
+    lower = np.clip(np.expm1(y_pred_log - z * std_sales), 0, None)
+    upper = np.clip(
+        np.expm1(y_pred_log + z * std_sales * upper_factor),
+        0, None
+    )
+    upper = np.maximum(upper, lower)
+    return lower.round(2), upper.round(2)
+
+
 def predict(
     historical_df: pd.DataFrame,
     horizon: int,
@@ -275,13 +331,12 @@ def predict(
     )
 
     # Cuantiles en escala log y luego revertir log1p
-    results['lower_bound'] = np.clip(
-        np.expm1(y_pred_log - 1.96 * results['std_sales']),
-        0, None
-    ).round(2)
-    results['upper_bound'] = np.expm1(
-        y_pred_log + 1.96 * results['std_sales'] * 1.5
-    ).round(2)
+    lower_bound, upper_bound = _build_confidence_intervals(
+        y_pred_log,
+        results['std_sales'].values,
+    )
+    results['lower_bound'] = lower_bound
+    results['upper_bound'] = upper_bound
 
     results = results.drop(columns=['std_sales'])
 
