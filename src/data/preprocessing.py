@@ -91,7 +91,35 @@ def _merge_datasets(df: pd.DataFrame,
     df = df.merge(stores, on='store_nbr', how='left')
     logger.info(f"  Post merge stores: {df.shape}")
 
-    # 2. Oil
+    # 2. Oil — interpolar ANTES del merge cuando aún tiene 1 fila por fecha
+    #    Si se hace después, interpolate() trata las 33 filas por fecha
+    #    como 33 pasos temporales → valores erróneos y diferentes por familia.
+    #    El petróleo crudo NO cotiza en fines de semana: las filas de sábado/
+    #    domingo ni siquiera existen en el CSV, por lo que primero hay que
+    #    reindexar al rango diario completo para crearlas como NaN y que la
+    #    interpolación lineal las rellene con el midpoint correcto.
+    null_oil_before = oil['dcoilwtico'].isnull().sum()
+    oil = (
+        oil[['date', 'dcoilwtico']]
+        .drop_duplicates('date')
+        .set_index('date')
+        .sort_index()
+        .reindex(pd.date_range(oil['date'].min(), oil['date'].max()))
+    )
+    oil = oil.reset_index().rename(columns={'index': 'date'})
+    oil['dcoilwtico'] = (
+        oil['dcoilwtico']
+        .interpolate(method='linear')
+        .ffill()
+        .bfill()
+    )
+    null_oil_after = oil['dcoilwtico'].isnull().sum()
+    logger.info(
+        f"  Oil: {null_oil_before} nulos pre-interpolación "
+        f"→ {null_oil_after} post-interpolación "
+        f"({len(oil)} fechas diarias)"
+    )
+
     df = df.merge(oil, on='date', how='left')
     logger.info(f"  Post merge oil: {df.shape}")
 
@@ -183,24 +211,15 @@ def _handle_nulls(df: pd.DataFrame) -> pd.DataFrame:
     """
     logger.info("Tratando nulos...")
 
-    # A Oil se aplica interpolación lineal + forward fill
-    # Los mercados no cotizan fines de semana
-    # interpolamos para tener un valor continuo
-    null_oil_before = df['dcoilwtico'].isnull().sum()
-    df['dcoilwtico'] = (
-        df.sort_values('date')
-        .groupby('store_nbr')['dcoilwtico']
-        .transform(lambda x:
-            x.interpolate(method='linear')
-             .ffill()
-             .bfill()
-        )
-    )
+    # Oil: interpolación se hace en _merge_datasets antes del merge
+    # Aquí solo verificamos que no queden nulos (edge case)
     null_oil_after = df['dcoilwtico'].isnull().sum()
-    logger.info(
-        f"  Oil: {null_oil_before:,} nulos : "
-        f"{null_oil_after:,} nulos"
-    )
+    if null_oil_after > 0:
+        logger.warning(
+            f"  Oil: {null_oil_after} nulos restantes "
+            f"post-interpolación (en _merge_datasets)"
+        )
+        df['dcoilwtico'] = df['dcoilwtico'].ffill().bfill()
 
 
     # Transactions asegurar ceros
