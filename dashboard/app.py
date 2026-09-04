@@ -156,146 +156,68 @@ if selected != "(Todas las familias)":
 else:
     subset = predictions.copy()
 
-left, right = st.columns([3, 2])
+if family_code is not None:
+    st.markdown(f"#### {selected}")
+    display = subset.sort_values("date")
+    fig = go.Figure()
 
-with left:
-    if family_code is not None:
-        st.markdown(f"#### {selected}")
-        display = subset.sort_values("date")
-        fig = go.Figure()
-
-        bt = assets["backtest"].get(horizon)
-        if bt is not None and not bt.empty:
-            bt_fam = bt[
-                (bt["store_nbr"] == store_nbr) &
-                (bt["family"] == family_code)
-            ].sort_values("date")
-            if not bt_fam.empty:
-                fig.add_trace(
-                    go.Scatter(
-                        x=bt_fam["date"], y=bt_fam["real_sales"],
-                        mode="lines+markers", name="Real (test)",
-                        line=dict(color="#2ca02c", width=2),
-                    )
-                )
-                fig.add_trace(
-                    go.Scatter(
-                        x=bt_fam["date"], y=bt_fam["y_pred_real"],
-                        mode="lines+markers", name="Backtest",
-                        line=dict(color="#ff7f0e", width=2, dash="dash"),
-                    )
-                )
-
-        fig.add_trace(
-            go.Scatter(
-                x=display["date"], y=display["predicted_sales"],
-                mode="lines+markers", name="Predicción",
-                line=dict(color="#1f77b4", width=2),
-            )
-        )
-        fig.add_trace(
-            go.Scatter(
-                x=display["date"], y=display["lower_bound"],
-                mode="lines", name="li",
-                line=dict(color="red", dash="dash", width=1.5),
-            )
-        )
-        fig.add_trace(
-            go.Scatter(
-                x=display["date"], y=display["upper_bound"],
-                mode="lines", name="ls",
-                line=dict(color="red", dash="dash", width=1.5),
-            )
-        )
-        fig.add_vline(
-            x=display["date"].min(),
-            line_dash="dot", line_color="gray",
-            annotation_text="Predicción inicia",
-            annotation_position="top left",
-        )
-        fig.update_layout(
-            height=420, margin=dict(l=0, r=0, t=30, b=0),
-            yaxis_title="Ventas",
-            legend=dict(orientation="h", y=1.02),
-        )
-        st.plotly_chart(fig, width="stretch")
-    else:
-        st.markdown(
-            "#### Top familias por volumen predicho"
-        )
-        top = (
-            subset.groupby("family_name")["predicted_sales"]
-            .sum().nlargest(8).reset_index()
-        )
-        bar = go.Figure(
-            go.Bar(
-                x=top["family_name"], y=top["predicted_sales"],
-                marker_color="#1f77b4",
-            )
-        )
-        bar.update_layout(
-            height=420, margin=dict(l=0, r=0, t=30, b=0),
-            yaxis_title="Ventas predichas (total horizonte)",
-        )
-        st.plotly_chart(bar, width="stretch")
-
-        st.markdown("#### Series agregadas (todas las familias)")
-        bt = assets["backtest"].get(horizon)
-        if bt is not None and not bt.empty:
-            bt_store = bt[bt["store_nbr"] == store_nbr]
-            bt_daily = (
-                bt_store.groupby("date", as_index=False)[
-                    ["real_sales", "y_pred_real"]
-                ].sum()
-            )
-            fut_daily = (
-                subset.groupby("date", as_index=False)[
-                    ["predicted_sales"]
-                ].sum()
-            )
-            fig_ts = go.Figure()
-            fig_ts.add_trace(
+    bt = assets["backtest"].get(horizon)
+    if bt is not None and not bt.empty:
+        bt_fam = bt[
+            (bt["store_nbr"] == store_nbr) &
+            (bt["family"] == family_code)
+        ].sort_values("date")
+        if not bt_fam.empty:
+            fig.add_trace(
                 go.Scatter(
-                    x=bt_daily["date"], y=bt_daily["real_sales"],
+                    x=bt_fam["date"], y=bt_fam["real_sales"],
                     mode="lines+markers", name="Real (test)",
-                    line=dict(color="#2ca02c", width=2),
+                    line=dict(color="#37474f", width=2),
                 )
             )
-            fig_ts.add_trace(
+            fig.add_trace(
                 go.Scatter(
-                    x=bt_daily["date"], y=bt_daily["y_pred_real"],
+                    x=bt_fam["date"], y=bt_fam["y_pred_real"],
                     mode="lines+markers", name="Backtest",
                     line=dict(color="#ff7f0e", width=2, dash="dash"),
                 )
             )
-            fig_ts.add_trace(
-                go.Scatter(
-                    x=fut_daily["date"], y=fut_daily["predicted_sales"],
-                    mode="lines+markers", name="Predicción",
-                    line=dict(color="#1f77b4", width=2),
-                )
-            )
-            fig_ts.add_vline(
-                x=fut_daily["date"].min(),
-                line_dash="dot", line_color="gray",
-                annotation_text="Predicción inicia",
-                annotation_position="top left",
-            )
-            fig_ts.update_layout(
-                height=420, margin=dict(l=0, r=0, t=30, b=0),
-                yaxis_title="Ventas (agregado por día)",
-                legend=dict(orientation="h", y=1.02),
-            )
-            st.plotly_chart(fig_ts, width="stretch")
-        else:
-            st.info(
-                "No se encontró `data/predictions/"
-                "backtest_predictions_h{horizon}.parquet`. "
-                "Ejecuta `src/models/evaluate.py "
-                "--horizon {horizon}` para generar la comparación."
-            )
 
-with right:
+    fig.add_trace(
+        go.Scatter(
+            x=display["date"], y=display["predicted_sales"],
+            mode="lines+markers", name="Predicción",
+            line=dict(color="#1565c0", width=2),
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=display["date"], y=display["upper_bound"],
+            mode="lines", line=dict(width=0), showlegend=False,
+            hoverinfo="skip",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=display["date"], y=display["lower_bound"],
+            mode="lines", line=dict(width=0), showlegend=False,
+            fill="tonexty", fillcolor="rgba(158,202,225,0.20)",
+            hoverinfo="skip",
+        )
+    )
+    fig.add_vline(
+        x=display["date"].min(),
+        line_dash="dot", line_color="gray",
+        annotation_text="Predicción inicia",
+        annotation_position="top left",
+    )
+    fig.update_layout(
+        height=560, margin=dict(l=0, r=0, t=30, b=0),
+        yaxis_title="Ventas",
+        legend=dict(orientation="h", y=1.02),
+    )
+    st.plotly_chart(fig, width="stretch")
+
     st.markdown("#### Detalle")
     detail = subset[["date", "family_name", "predicted_sales",
                      "lower_bound", "upper_bound"]].copy()
@@ -307,13 +229,88 @@ with right:
         detail.sort_values("Fecha"),
         width="stretch", hide_index=True, height=420,
     )
+else:
+    st.markdown(
+        "#### Top familias por volumen predicho"
+    )
+    top = (
+        subset.groupby("family_name")["predicted_sales"]
+        .sum().nlargest(8).reset_index()
+    )
+    bar = go.Figure(
+        go.Bar(
+            x=top["family_name"], y=top["predicted_sales"],
+            marker_color="#1565c0",
+        )
+    )
+    bar.update_layout(
+        height=560, margin=dict(l=0, r=0, t=30, b=0),
+        yaxis_title="Ventas predichas (total horizonte)",
+    )
+    st.plotly_chart(bar, width="stretch")
+
+    st.markdown("#### Series agregadas (todas las familias)")
+    bt = assets["backtest"].get(horizon)
+    if bt is not None and not bt.empty:
+        bt_store = bt[bt["store_nbr"] == store_nbr]
+        bt_daily = (
+            bt_store.groupby("date", as_index=False)[
+                ["real_sales", "y_pred_real"]
+            ].sum()
+        )
+        fut_daily = (
+            subset.groupby("date", as_index=False)[
+                ["predicted_sales"]
+            ].sum()
+        )
+        fig_ts = go.Figure()
+        fig_ts.add_trace(
+            go.Scatter(
+                x=bt_daily["date"], y=bt_daily["real_sales"],
+                mode="lines+markers", name="Real (test)",
+                line=dict(color="#37474f", width=2),
+            )
+        )
+        fig_ts.add_trace(
+            go.Scatter(
+                x=bt_daily["date"], y=bt_daily["y_pred_real"],
+                mode="lines+markers", name="Backtest",
+                line=dict(color="#ff7f0e", width=2, dash="dash"),
+            )
+        )
+        fig_ts.add_trace(
+            go.Scatter(
+                x=fut_daily["date"], y=fut_daily["predicted_sales"],
+                mode="lines+markers", name="Predicción",
+                line=dict(color="#1565c0", width=2),
+            )
+        )
+        fig_ts.add_vline(
+            x=fut_daily["date"].min(),
+            line_dash="dot", line_color="gray",
+            annotation_text="Predicción inicia",
+            annotation_position="top left",
+        )
+        fig_ts.update_layout(
+            height=560, margin=dict(l=0, r=0, t=30, b=0),
+            yaxis_title="Ventas (agregado por día)",
+            legend=dict(orientation="h", y=1.02),
+        )
+        st.plotly_chart(fig_ts, width="stretch")
+    else:
+        st.info(
+            "No se encontró `data/predictions/"
+            "backtest_predictions_h{horizon}.parquet`. "
+            "Ejecuta `src/models/evaluate.py "
+            "--horizon {horizon}` para generar la comparación."
+        )
 
 st.divider()
 st.caption(
     "La ventana de 8 semanas previa a la predicción corresponde al test set "
     "de `evaluate.py`: se muestran las ventas reales y la predicción backtest "
     "del modelo sobre ese mismo periodo. "
-    "Los intervalos de confianza del 95% se calculan en escala log a partir "
+    "Los intervalos de confianza se calculan en escala log a partir "
     "de la desviación histórica de cada tienda-familia. "
     "La predicción es determinística dado el historial; "
     "los resultados se cachean por tienda y horizonte."
