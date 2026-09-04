@@ -14,7 +14,7 @@ mismo modelo** que sirve la API FastAPI. Paridad garantizada por diseño.
 - **Selector de tienda / horizonte / familia:** explora las 54 tiendas, los
   horizontes de 7 y 30 días, y las 33 familias de productos.
 - **Gráfico interactivo (Plotly):** serie temporal de la predicción con
-  intervalo de confianza del 95%, o top 8 familias por volumen.
+  intervalo de confianza (configurable via `confidence.z` en config.yaml), o top 8 familias por volumen.
 - **Tabla de detalle:** predicción por fecha con límites inferior y superior.
 
 ## 🚀 Ejecutar en local

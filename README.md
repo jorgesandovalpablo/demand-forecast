@@ -773,12 +773,36 @@ contribución media absoluta a las predicciones.
 - **Fix intervalo de confianza (li/ls) del dashboard:** la banda ahora usa la
   **desviación estándar de los residuos reales** por store/familia
   (`compute_residual_std` → `models/residual_std_h{h}.pkl`) en vez de la
-  volatilidad histórica (`venta_std_historica`), y `upper_factor` es simétrico
+  volatilidad histórica (`venta_std_historica`), y `upper_factor` simétrico
   (1.0, antes 1.5). Ejemplo tienda 1 GROCERY: `[970, 3179, 18851]` →
   `[2326, 3044, 3983]` (ls/pred 5.9 → 1.31, li/pred 0.31 → 0.76). El intervalo
   se construye en escala log y se revierte con `expm1` (multiplicativo en
   escala real); sigue siendo exclusivo de `predict.py` (`evaluate.py` no
   genera intervalos).
+- **IC como área semi-transparente:** el intervalo de confianza se dibuja
+  como una sombra azul claro (20% opacidad) con `fill="tonexty"`, en vez de
+  líneas rojas li/ls separadas. La predicción es la traza visible; el IC es
+  un relleno de fondo sutil.
+- **z configurable** (`configs/config.yaml: confidence.z`): el multiplicador
+  del intervalo de confianza ya no está hardcodeado en 1.96; ahora se lee
+  desde config (valor actual: **1.1**, ≈86% de confianza). Actualizar `z`
+  en el yaml sin tocar código.
+- **Rediseño visual del dashboard:**
+  - **Ventana de backtest en gris:** fondo gris semitransparente
+    (`vrect, opacity=0.10`) cubriendo el periodo de test, alineado con la
+    vline "Predicción inicia".
+  - **Leyendas más grandes:** tamaño de fuente 16 en ambas vistas (antes 12).
+  - **IC también en "Todas las familias":** la vista agregada ahora muestra
+    el intervalo de confianza como área sombreada (anteriormente solo la
+    predicción).
+  - **Layout full-width:** la gráfica ocupa todo el ancho (sin columnas);
+    la tabla "Detalle" se muestra debajo de la gráfica.
+  - **Altura de gráficas:** de 420px a 560px para mayor legibilidad.
+  - **Colores actualizados:** Real (test) en azul marino/gris oscuro
+    `#37474f` (antes verde), Predicción en azul vibrante `#1565c0`.
+  - **Caption de onpromotion:** leyenda bajo la gráfica explicando que los
+    picos del forecast se alinean con los valores reales de la columna
+    `onpromotion` del dataset.
 - Config version `0.4.6 → 0.6.0`.
 
 ### v0.5.0 (2026-09-01)
