@@ -319,3 +319,9 @@ st.caption(
     "La predicción es determinística dado el historial; "
     "los resultados se cachean por tienda y horizonte."
 )
+st.caption(
+    "Los picos en la predicción (p. ej. 16-ago y días cercanos) se alinean "
+    "con los valores reales de la columna `onpromotion` del dataset: "
+    "días con muchas familias en promoción generan predicciones más altas, "
+    "reflejando el patrón real del periodo."
+)
