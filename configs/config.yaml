@@ -104,6 +104,9 @@ optuna:
   storage: "sqlite:///data/optuna_studies.db"
   pruner: "hyperband"
 
+confidence:
+  z: 1.1
+
 mlflow:
   experiment_name: "demand-forecast"
   tracking_uri: "https://dagshub.com/jorgesandovalpablo/demand-forecast.mlflow"

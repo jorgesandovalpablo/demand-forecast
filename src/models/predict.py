@@ -384,9 +384,11 @@ def predict(
     results['std_sales'] = results['std_sales'].fillna(global_std)
 
     # Cuantiles en escala log y luego revertir log1p
+    z = config.get('confidence', {}).get('z', 1.96)
     lower_bound, upper_bound = _build_confidence_intervals(
         y_pred_log,
         results['std_sales'].values,
+        z=z,
     )
     results['lower_bound'] = lower_bound
     results['upper_bound'] = upper_bound
