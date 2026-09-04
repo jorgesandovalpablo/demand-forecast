@@ -168,6 +168,11 @@ if family_code is not None:
             (bt["family"] == family_code)
         ].sort_values("date")
         if not bt_fam.empty:
+            fig.add_vrect(
+                x0=bt_fam["date"].min(), x1=display["date"].min(),
+                fillcolor="gray", opacity=0.10,
+                layer="below", line_width=0,
+            )
             fig.add_trace(
                 go.Scatter(
                     x=bt_fam["date"], y=bt_fam["real_sales"],
@@ -214,7 +219,7 @@ if family_code is not None:
     fig.update_layout(
         height=560, margin=dict(l=0, r=0, t=30, b=0),
         yaxis_title="Ventas",
-        legend=dict(orientation="h", y=1.02),
+        legend=dict(orientation="h", y=1.02, font=dict(size=16)),
     )
     st.plotly_chart(fig, width="stretch")
 
@@ -260,10 +265,15 @@ else:
         )
         fut_daily = (
             subset.groupby("date", as_index=False)[
-                ["predicted_sales"]
+                ["predicted_sales", "lower_bound", "upper_bound"]
             ].sum()
         )
         fig_ts = go.Figure()
+        fig_ts.add_vrect(
+            x0=bt_daily["date"].min(), x1=fut_daily["date"].min(),
+            fillcolor="gray", opacity=0.10,
+            layer="below", line_width=0,
+        )
         fig_ts.add_trace(
             go.Scatter(
                 x=bt_daily["date"], y=bt_daily["real_sales"],
@@ -285,6 +295,21 @@ else:
                 line=dict(color="#1565c0", width=2),
             )
         )
+        fig_ts.add_trace(
+            go.Scatter(
+                x=fut_daily["date"], y=fut_daily["upper_bound"],
+                mode="lines", line=dict(width=0), showlegend=False,
+                hoverinfo="skip",
+            )
+        )
+        fig_ts.add_trace(
+            go.Scatter(
+                x=fut_daily["date"], y=fut_daily["lower_bound"],
+                mode="lines", line=dict(width=0), showlegend=False,
+                fill="tonexty", fillcolor="rgba(158,202,225,0.20)",
+                hoverinfo="skip",
+            )
+        )
         fig_ts.add_vline(
             x=fut_daily["date"].min(),
             line_dash="dot", line_color="gray",
@@ -294,7 +319,7 @@ else:
         fig_ts.update_layout(
             height=560, margin=dict(l=0, r=0, t=30, b=0),
             yaxis_title="Ventas (agregado por día)",
-            legend=dict(orientation="h", y=1.02),
+            legend=dict(orientation="h", y=1.02, font=dict(size=16)),
         )
         st.plotly_chart(fig_ts, width="stretch")
     else:
