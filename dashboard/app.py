@@ -195,17 +195,16 @@ with left:
         )
         fig.add_trace(
             go.Scatter(
-                x=display["date"], y=display["upper_bound"],
-                mode="lines", line=dict(width=0), showlegend=False,
-                hoverinfo="skip",
+                x=display["date"], y=display["lower_bound"],
+                mode="lines", name="li",
+                line=dict(color="red", dash="dash", width=1.5),
             )
         )
         fig.add_trace(
             go.Scatter(
-                x=display["date"], y=display["lower_bound"],
-                mode="lines", line=dict(width=0), showlegend=False,
-                fill="tonexty", fillcolor="rgba(31,119,180,0.2)",
-                name="Intervalo de confianza",
+                x=display["date"], y=display["upper_bound"],
+                mode="lines", name="ls",
+                line=dict(color="red", dash="dash", width=1.5),
             )
         )
         fig.add_vline(
