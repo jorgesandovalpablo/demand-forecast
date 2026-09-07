@@ -63,3 +63,65 @@ estén disponibles.
 ./venv/bin/python src/models/tune.py --horizon 30 --trials 150
 ./venv/bin/python src/models/retrain.py --horizon 30 --params-file reports/optuna/best_params_h30.json
 ```
+
+---
+
+## Fix del CI: dashboard tests con importorskip (commit `7bc7198`)
+
+### Problema detectado
+
+El CI falló en **collection** de pytest (exit code 2):
+
+```
+ERROR collecting tests/test_dashboard.py
+ModuleNotFoundError: No module named 'streamlit'
+```
+
+La suite entera (97 tests) abortaba antes de ejecutar un solo test.
+
+### Por qué ocurrió
+
+1. `tests/test_dashboard.py:10` importaba `from streamlit.testing.v1 import AppTest`
+   a **nivel de módulo** (fuera de cualquier función).
+2. Streamlit **no está** en `requirements.txt` raíz (solo en
+   `dashboard/requirements.txt`); CI instala únicamente el raíz
+   (`pip install -r requirements.txt`).
+3. Pytest importa **todos** los archivos `test_*.py` durante la
+   **collection**, **antes** de evaluar cualquier `@pytest.mark.skipif`.
+   Aunque los tests del dashboard ya tenían `skipif` (saltan si faltan
+   artefactos), el `ModuleNotFoundError` ocurría al importar el módulo →
+   pytest abortaba la suite completa.
+4. Local no se detectaba porque streamlit **sí** está instalado en la
+   venv del usuario, y el skipif activaba correctamente.
+
+### Fix aplicado
+
+`pytest.importorskip()` a nivel de módulo, **antes** del import de la
+clase `AppTest`:
+
+```python
+pytest.importorskip(
+    "streamlit.testing.v1",
+    reason="Streamlit no instalado"
+)
+from streamlit.testing.v1 import AppTest  # noqa: E402
+```
+
+- Si streamlit **NO** está (CI) → pytest salta el archivo completo sin
+  fallar la collection.
+- Si streamlit **sí** está (local) → se importa la clase correctamente.
+  El import va **después** del guard porque `importorskip()` retorna el
+  módulo, no la clase (si se asigna `AppTest = importorskip(...)` se
+  rompe `AppTest.from_file()` con `AttributeError`).
+
+Verificado: 99/99 tests locales pasando, flake8 F limpio. Los `skipif`
+existentes siguen funcionando correctamente.
+
+### Lección
+
+Dependencias **opcionales** usadas por tests (paquetes de dashboard,
+extras de integración) deben protegerse con `pytest.importorskip()`
+directamente sobre el módulo, y el import de la clase debe ir **después**
+del guard. Un import directo a nivel de módulo rompe la collection
+completa en entornos que no tienen la dependencia, sin importar los
+`skipif` configurados en las funciones de test.
