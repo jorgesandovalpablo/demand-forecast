@@ -7,7 +7,11 @@ Requiere los artefactos (modelos, histórico y parquet de backtest) y
 import pytest
 from pathlib import Path
 
-from streamlit.testing.v1 import AppTest
+pytest.importorskip(
+    "streamlit.testing.v1",
+    reason="Streamlit no instalado"
+)
+from streamlit.testing.v1 import AppTest  # noqa: E402
 
 APP_PATH = str(
     Path(__file__).resolve().parent.parent / "dashboard" / "app.py"
