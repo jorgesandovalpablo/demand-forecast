@@ -762,6 +762,15 @@ contribución media absoluta a las predicciones.
 
 ## 📝 CHANGELOG
 
+### v0.6.1 (2026-09-06)
+- **Optuna espacio anti-overfit:** `suggest_params` unificado para h7/h30
+  con rangos acotados (`num_leaves 16-96`, `lr ≤0.05`,
+  `min_data_in_leaf 50-300`, `lambda ≥0.05`). Elimina params que
+  sobreajustaban CV (ej. `num_leaves 200`, `lr 0.09`, `λ≈0` del
+  estudio anterior). Estudio h30 eliminado para arrancar limpio.
+- **Timeout Optuna:** `timeout_seconds` 28800 → 40000 (~11h) para
+  soportar 150 trials con espacio acotado.
+
 ### v0.6.0 (2026-09-03)
 - **Ventana backtest en el dashboard:** `evaluate.py` persiste
   `data/predictions/backtest_predictions_h{h}.parquet` con
