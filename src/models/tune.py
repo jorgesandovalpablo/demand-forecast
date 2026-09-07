@@ -1,12 +1,13 @@
 """
 Optuna hyperparameter tuning para LightGBM.
 
-Estrategia agresiva (laptop sin GPU):
+Estrategia anti-overfit (espacio acotado):
+  - Ranges unificados para h7 y h30
+  - num_leaves 16-96, lr ≤0.05, min_data ≥50, lambda ≥0.05
   - Subsampleo 30% de filas (stratificado por store+family)
   - 4 folds walk-forward (vs 5 en entrenamiento normal)
   - 600 boosting rounds con early stopping 80
   - Feature engineering caching (una sola vez por study)
-  - Ranges diferenciados por horizon (h7: L1, h30: Huber)
   - Storage SQLite para resume automático (load_if_exists)
 
 Coste estimado: ~10-15 min/trial → 150 trials en ~25-35 horas.
@@ -41,12 +42,16 @@ logger = get_logger(__name__)
 # ─────────────────────────────────────────
 def suggest_params(trial: optuna.Trial, horizon: int) -> dict:
     """
-    Space de búsqueda para Optuna — ranges diferenciados por horizon.
+    Space de búsqueda para Optuna — ranges anti-overfit.
+
+    Espacio unificado para h7 y h30 (consistencia).
+    Rangos acotados a la región que generaliza mejor:
+    num_leaves ≤96, lr ≤0.05, min_data_in_leaf ≥50,
+    lambda ≥0.05.
 
     Fijo: objective, metric, random_state, n_jobs, verbosity.
-    Tunneables (horizon-specific): num_leaves, learning_rate,
-        min_data_in_leaf, lambda_l1, lambda_l2.
-    Tunneables (shared): feature_fraction, bagging_fraction,
+    Tunneables: num_leaves, learning_rate, min_data_in_leaf,
+        lambda_l1, lambda_l2, feature_fraction, bagging_fraction,
         bagging_freq, max_bin.
     """
     fixed = {
@@ -57,45 +62,28 @@ def suggest_params(trial: optuna.Trial, horizon: int) -> dict:
         "n_jobs": 2,
     }
 
-    if horizon == 7:
-        tunable = {
-            "num_leaves": trial.suggest_int("num_leaves", 15, 256),
-            "learning_rate": trial.suggest_float(
-                "learning_rate", 0.005, 0.2, log=True
-            ),
-            "min_data_in_leaf": trial.suggest_int(
-                "min_data_in_leaf", 5, 200, log=True
-            ),
-            "lambda_l1": trial.suggest_float(
-                "lambda_l1", 1e-8, 5.0, log=True
-            ),
-            "lambda_l2": trial.suggest_float(
-                "lambda_l2", 1e-8, 5.0, log=True
-            ),
-        }
-    else:
-        tunable = {
-            "num_leaves": trial.suggest_int("num_leaves", 15, 256),
-            "learning_rate": trial.suggest_float(
-                "learning_rate", 0.005, 0.15, log=True
-            ),
-            "min_data_in_leaf": trial.suggest_int(
-                "min_data_in_leaf", 5, 300, log=True
-            ),
-            "lambda_l1": trial.suggest_float(
-                "lambda_l1", 1e-8, 10.0, log=True
-            ),
-            "lambda_l2": trial.suggest_float(
-                "lambda_l2", 1e-8, 10.0, log=True
-            ),
-        }
+    tunable = {
+        "num_leaves": trial.suggest_int("num_leaves", 16, 96),
+        "learning_rate": trial.suggest_float(
+            "learning_rate", 0.005, 0.05, log=True
+        ),
+        "min_data_in_leaf": trial.suggest_int(
+            "min_data_in_leaf", 50, 300, log=True
+        ),
+        "lambda_l1": trial.suggest_float(
+            "lambda_l1", 0.05, 5.0, log=True
+        ),
+        "lambda_l2": trial.suggest_float(
+            "lambda_l2", 0.05, 5.0, log=True
+        ),
+    }
 
     shared = {
         "feature_fraction": trial.suggest_float(
-            "feature_fraction", 0.4, 1.0
+            "feature_fraction", 0.5, 1.0
         ),
         "bagging_fraction": trial.suggest_float(
-            "bagging_fraction", 0.4, 1.0
+            "bagging_fraction", 0.5, 1.0
         ),
         "bagging_freq": trial.suggest_int("bagging_freq", 1, 7),
         "max_bin": trial.suggest_int("max_bin", 100, 300),
@@ -231,7 +219,10 @@ def run_optuna_search(
                 lambda r: hash(tuple(r)) % 10000 / 10000, axis=1
             ),
         )
-        logger.info(f"  Subsample: {len(df_sub):,} filas ({subsample_ratio:.0%})")
+        logger.info(
+            f"  Subsample: {len(df_sub):,} filas "
+            f"({subsample_ratio:.0%})"
+        )
     else:
         df_sub = df
 

@@ -94,7 +94,7 @@ training:
 
 optuna:
   n_trials: 150
-  timeout_seconds: 28800
+  timeout_seconds: 40000
   n_folds: 4
   subsample_ratio: 0.30
   max_boost_round: 600
