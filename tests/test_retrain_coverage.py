@@ -4,12 +4,11 @@
 Cubre: _load_current_metrics, _evaluate_new_model, _rotate_models,
 _discard_staging, _artifact_paths, ARTIFACT_KINDS.
 """
-from unittest.mock import patch, MagicMock, mock_open
+from unittest.mock import patch, MagicMock
 import numpy as np
 import pandas as pd
 import pytest
 from pathlib import Path
-import shutil
 
 
 class TestLoadCurrentMetrics:

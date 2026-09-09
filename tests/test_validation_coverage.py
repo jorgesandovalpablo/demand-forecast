@@ -4,10 +4,8 @@
 Cubre: summarize_validation, plot_folds, walk_forward_splits,
 FoldResult/ValidationResult dataclasses.
 """
-from unittest.mock import patch, MagicMock
-import numpy as np
+from unittest.mock import patch
 import pandas as pd
-import pytest
 
 
 class TestSummarizeValidation:
@@ -24,7 +22,6 @@ class TestSummarizeValidation:
             )
             for i in range(1, 4)
         ]
-        from src.models.validation import summarize_validation
         summary = summarize_validation(results)
         assert summary.rmse_mean > 0
         assert summary.rmse_std >= 0
@@ -43,7 +40,6 @@ class TestSummarizeValidation:
                 rmsle=0.5, wape=15.0, n_train=100, n_val=50,
             )
         ]
-        from src.models.validation import summarize_validation
         summary = summarize_validation(results)
         assert summary.rmse_std == 0.0
         assert summary.mae_std == 0.0

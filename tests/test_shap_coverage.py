@@ -6,8 +6,6 @@ Cubre: classify_features, compute_shap_values (mock), save_results.
 from unittest.mock import patch, MagicMock
 import numpy as np
 import pandas as pd
-import pytest
-from pathlib import Path
 
 
 class TestClassifyFeatures:

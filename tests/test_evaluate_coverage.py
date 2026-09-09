@@ -8,7 +8,6 @@ plot_predictions, plot_feature_importance, plot_errors_by_family.
 from unittest.mock import patch, MagicMock
 import numpy as np
 import pandas as pd
-import pytest
 
 
 # ── Helpers ────────────────────────────────

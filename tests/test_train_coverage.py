@@ -4,9 +4,7 @@
 Cubre: get_feature_cols, _save_model, setup_mlflow.
 """
 from unittest.mock import patch, MagicMock
-import numpy as np
 import pandas as pd
-import pytest
 from pathlib import Path
 
 
@@ -54,7 +52,7 @@ class TestSaveModel:
         mock_model = MagicMock()
         mock_pipeline = MagicMock()
         with patch("src.models.train.Path", wraps=Path) as mock_path_cls, \
-             patch("src.models.train.joblib") as mock_joblib:
+             patch("src.models.train.joblib"):
             mock_path_cls.return_value = tmp_path / "models"
             (tmp_path / "models").mkdir()
             model_path, pipeline_path = _save_model(
