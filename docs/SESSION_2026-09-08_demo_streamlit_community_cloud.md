@@ -105,3 +105,16 @@ Suite completa: 104/104 passed (incluye 5 nuevos en test_deploy_dashboard.py).
 - ✅ **URL desplegada:** https://demand-forecast-minimarket.streamlit.app
 - ✅ **README.md:** placeholders `<SPACE_URL>` reemplazados, heading L1 corregido
 - ✅ **dashboard/README.md:** referencias de HuggingFace Spaces migradas a Community Cloud
+
+## Repo cleanup (commit `1047ca1`)
+
+- **pyproject.toml:** versión `0.1.0` → `0.7.0`
+- **Python unificado a 3.13:** `requires-python >=3.13`, black `py313`,
+  Dockerfile `python:3.13-slim`, retrain.yml `3.11` → `3.13`
+- **LICENSE:** "Alejandro Sandoval" → "Jorge Sandoval"
+- **README TOC:** corregido orden + 5 entradas nuevas (MLflow, Model
+  Registry, Estado actual, CHANGELOG, Licencia)
+- **mlruns/** des-trackeado (108 archivos, `.gitignore` ya lo cubría)
+- **demand_forecast.egg-info/** eliminado del disco
+- **Docs locales:** baselines marcado RESUELTO (resume, PROJECT_KNOWLEDGE,
+  handoff), secrets GitHub Actions confirmados ✅

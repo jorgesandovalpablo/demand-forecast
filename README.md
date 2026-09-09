@@ -392,7 +392,7 @@ demand-forecast/
 ### Requisitos previos
 
 ```
-Python 3.10+
+Python 3.13+
 Git
 Docker (opcional, para deployment)
 Cuenta en DagsHub (para MLflow remoto)
@@ -546,7 +546,7 @@ curl http://localhost:8000/health
 {
   "status": "healthy",
   "models_loaded": [7, 30],
-  "version": "0.1.0"
+  "version": "0.7.0"
 }
 ```
 
@@ -807,6 +807,11 @@ contribución media absoluta a las predicciones.
   reales de Streamlit Community Cloud.
 - **dashboard/README.md actualizado:** referencias de HuggingFace Spaces
   a Streamlit Community Cloud.
+- **Repo cleanup:** `pyproject.toml` versión 0.1.0 → 0.7.0, Python
+  unificado a 3.13 (pyproject, Dockerfile, retrain.yml), LICENSE corregido
+  ("Alejandro" → "Jorge Sandoval"), TOC del README corregido (orden + 5
+  entradas nuevas), `mlruns/` des-trackeado (108 archivos, .gitignore ya
+  lo cubría), `demand_forecast.egg-info/` eliminado.
 - Tests: 104/104 passed.
 
 ### v0.6.1 (2026-09-06)
