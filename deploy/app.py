@@ -30,9 +30,9 @@ def _load_stores() -> list[int]:
 
 
 @st.cache_data
-def _load_families() -> dict[str, str]:
+def _load_families() -> dict[int, str]:
     with open(ASSETS / "families.json") as f:
-        return json.load(f)
+        return {int(k): v for k, v in json.load(f).items()}
 
 
 @st.cache_data
@@ -121,7 +121,7 @@ predictions["family_name"] = predictions["family"].map(family_map).fillna(
 family_code = None
 if selected != "(Todas las familias)":
     family_code = next(
-        (int(c) for c, n in family_map.items() if n == selected), None
+        (c for c, n in family_map.items() if n == selected), None
     )
     subset = predictions[predictions["family"] == family_code]
     if subset.empty:

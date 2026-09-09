@@ -20,9 +20,9 @@ def _load_stores() -> list[int]:
         return json.load(f)
 
 
-def _load_families() -> dict[str, str]:
+def _load_families() -> dict[int, str]:
     with open(ASSETS / "families.json") as f:
-        return json.load(f)
+        return {int(k): v for k, v in json.load(f).items()}
 
 
 SKIP_ASSETS = not (
@@ -36,7 +36,7 @@ SKIP_ASSETS = not (
 @pytest.mark.skipif(SKIP_ASSETS, reason="Assets no materializados")
 class TestDeployDashboard:
     def test_sidebar_has_three_widgets(self):
-        app = AppTest.from_file(str(APP_PATH)).run()
+        app = AppTest.from_file(str(APP_PATH)).run(timeout=10)
         assert len(app.sidebar.selectbox) == 3
 
     def test_title_renders(self):
@@ -46,11 +46,11 @@ class TestDeployDashboard:
         )
 
     def test_run_no_errors(self):
-        app = AppTest.from_file(str(APP_PATH)).run()
+        app = AppTest.from_file(str(APP_PATH)).run(timeout=10)
         assert not app.exception
 
     def test_selecting_family_no_crash(self):
-        app = AppTest.from_file(str(APP_PATH)).run()
+        app = AppTest.from_file(str(APP_PATH)).run(timeout=10)
         families = _load_families()
         if not families:
             pytest.skip("Sin familias en families.json")
@@ -59,6 +59,15 @@ class TestDeployDashboard:
         assert not app.exception
 
     def test_toggle_horizon_no_crash(self):
-        app = AppTest.from_file(str(APP_PATH)).run()
+        app = AppTest.from_file(str(APP_PATH)).run(timeout=10)
         app.sidebar.selectbox[1].set_value(30).run()
         assert not app.exception
+
+    def test_family_view_renders_dataframe(self):
+        app = AppTest.from_file(str(APP_PATH)).run(timeout=10)
+        families = _load_families()
+        if not families:
+            pytest.skip("Sin familias en families.json")
+        app.sidebar.selectbox[2].set_value("BEVERAGES").run()
+        assert not app.exception
+        assert len(app.dataframe) > 0
