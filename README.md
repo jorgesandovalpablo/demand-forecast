@@ -182,7 +182,7 @@ retrain.py
 | **Container** | Docker + docker-compose | Deployment reproducible |
 | **CI** | GitHub Actions | Tests automáticos en cada push |
 | **Optimización** | Optuna | ✅ Integrado — `src/models/tune.py` con CLI `--horizon`, `--trials`, `--timeout` |
-| **Versionado datos** | DVC | ⚠️ Pendiente — declarado en requirements pero sin uso en src/ |
+| **Versionado datos** | DVC | ✅ Integrado — `data/raw` versionado vía DagsHub storage (remote `s3://dvc`) |
 | **Dependencias** | pip-tools | Versiones exactas y reproducibles |
 | **Calidad** | Black + Flake8 + isort | Estilo y linting automático |
 | **Tests** | pytest | 189 tests (184 unit en CI + 5 integración manual); badge `coverage.svg` |
@@ -786,7 +786,7 @@ contribución media absoluta a las predicciones.
 | Ítem | Detalle |
 |---|---|
 | Secrets de CI | ✅ Configurados: `MLFLOW_TRACKING_USERNAME/PASSWORD` en GitHub Actions |
-| DVC | Declarado en requirements sin uso; datos/modelos fuera de git |
+| DVC | ✅ Resuelto — `data/raw` versionado vía DagsHub storage (`dvc add`, `dvc push`) |
 | SHAP | Migrado a `src/models/shap_analysis.py`; flag `--shap` en `evaluate.py` |
 
 ### Limitaciones conocidas (deuda técnica aceptada)
@@ -796,6 +796,14 @@ contribución media absoluta a las predicciones.
 ---
 
 ## 📝 CHANGELOG
+
+### v0.8.0 (2026-09-09)
+- **DVC dataset versioning:** `dvc init` + remote DagsHub storage (`s3://dvc`).
+  `data/raw` (119MB, 6 CSVs Kaggle Store Sales) versionado con `dvc add` +
+  `dvc push`. Auth vía token DagsHub en `.dvc/config.local` (no versionado).
+  Remote endpoint: `dagshub.com/jorgesandovalpablo/demand-forecast.s3`.
+- **dvc-s3:** añadido a `requirements.txt` (dependencia S3 para DVC).
+- **pyproject.toml:** versión 0.7.0 → 0.8.0.
 
 ### v0.7.0 (2026-09-08)
 - **Demo Streamlit Community Cloud:** nuevo `deploy/app.py` autocontenido
