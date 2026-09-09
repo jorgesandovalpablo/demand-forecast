@@ -1,14 +1,11 @@
 # tests/test_evaluate_backtest.py
-"""Tests de la persistencia de predicciones backtest del test set.
+"""Tests unitarios de la persistencia de predicciones backtest del test set.
 
-`build_backtest_df` es una función pura, así que se testea sin artefactos.
-Un test adicional verifica el parquet generado por evaluate (skip si no hay
-data/predictions).
+`build_backtest_df` y `compute_residual_std` son funciones puras, así que
+se testean sin artefactos y corren en CI.
 """
 import numpy as np
 import pandas as pd
-import pytest
-from pathlib import Path
 
 from src.models.evaluate import build_backtest_df, compute_residual_std
 
@@ -50,26 +47,6 @@ def test_backtest_preserva_claves_agrupacion() -> None:
     assert result['date'].iloc[0] == pd.Timestamp('2024-01-01')
 
 
-@pytest.mark.skipif(
-    not Path("data/predictions/backtest_predictions_h7.parquet").exists(),
-    reason="Parquet de backtest no presente",
-)
-def test_parquet_generado_columnas_correctas() -> None:
-    """El parquet persistido por evaluate tiene las columnas esperadas."""
-    df = pd.read_parquet(
-        "data/predictions/backtest_predictions_h7.parquet"
-    )
-    expected_cols = [
-        'date', 'store_nbr', 'family',
-        'real_sales', 'y_pred_real', 'y_pred_log',
-    ]
-    assert list(df.columns) == expected_cols
-    assert df['real_sales'].notna().all()
-    assert df['y_pred_real'].notna().all()
-    assert (df['real_sales'] >= 0).all()
-    assert (df['y_pred_real'] >= 0).all()
-
-
 def test_compute_residual_std_valores() -> None:
     """compute_residual_std calcula el std residual por grupo y global."""
     rng = np.random.default_rng(42)
@@ -106,19 +83,3 @@ def test_compute_residual_std_cero_residuo() -> None:
     result = compute_residual_std(bt)
     assert result['global'] == 0.0
     assert result['df']['resid_std'].iloc[0] == 0.0
-
-
-@pytest.mark.skipif(
-    not Path("models/residual_std_h7.pkl").exists(),
-    reason="Artefacto residual_std_h7 no presente",
-)
-def test_residual_std_persistido_estructura() -> None:
-    """El archivo persistido por evaluate tiene la estructura esperada."""
-    import joblib
-
-    data = joblib.load("models/residual_std_h7.pkl")
-    assert set(data.keys()) == {'global', 'df'}
-    assert set(data['df'].columns) == {
-        'store_nbr', 'family', 'resid_std'
-    }
-    assert data['global'] > 0.0

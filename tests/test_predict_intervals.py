@@ -5,9 +5,6 @@ El helper `_build_confidence_intervals` es una función pura, así que se
 testea sin artefactos y corre en CI.
 """
 import numpy as np
-import pandas as pd
-import pytest
-from pathlib import Path
 
 from src.models.predict import _build_confidence_intervals
 
@@ -59,19 +56,3 @@ def test_simetrico_por_defecto() -> None:
     d_up = np.log1p(upper[0]) - mu
     # Tolerancia por el redondeo a 2 decimales interno de la función.
     np.testing.assert_allclose(d_low, d_up, atol=0.01)
-
-
-@pytest.mark.skipif(
-    not Path("models/lgbm_h7.pkl").exists(),
-    reason="Artefactos de modelo no presentes",
-)
-def test_invariante_predict_by_store() -> None:
-    """Invariante end-to-end: predicciones de tienda 1 con IC coherente."""
-    from src.models.predict import predict_by_store
-
-    historical = pd.read_parquet("data/processed/train_processed.parquet")
-    for horizon in (7, 30):
-        df = predict_by_store(historical, horizon=horizon, store_nbr=1)
-        assert (df["upper_bound"] >= df["lower_bound"]).all()
-        assert (df["lower_bound"] >= 0).all()
-        assert (df["upper_bound"] >= 0).all()

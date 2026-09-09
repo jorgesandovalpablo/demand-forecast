@@ -1,8 +1,7 @@
-# tests/test_dashboard.py
 """Tests del dashboard Streamlit (ventana backtest).
 
 Requiere los artefactos (modelos, histórico y parquet de backtest) y
-`streamlit.testing.v1.AppTest`. Se saltan si faltan los artefactos.
+`streamlit.testing.v1.AppTest`. Corren solo con `pytest tests/integration/`.
 """
 import pytest
 from pathlib import Path
@@ -14,16 +13,10 @@ pytest.importorskip(
 from streamlit.testing.v1 import AppTest  # noqa: E402
 
 APP_PATH = str(
-    Path(__file__).resolve().parent.parent / "dashboard" / "app.py"
+    Path(__file__).resolve().parent.parent.parent / "dashboard" / "app.py"
 )
 
 
-@pytest.mark.skipif(
-    not Path("models/lgbm_h7.pkl").exists()
-    or not Path("data/processed/train_processed.parquet").exists()
-    or not Path("data/predictions/backtest_predictions_h7.parquet").exists(),
-    reason="Artefactos de modelo/datos/backtest no presentes",
-)
 def test_dashboard_todas_sin_excepciones() -> None:
     """La vista '(Todas las familias)' renderiza y muestra la serie agregada."""
     at = AppTest.from_file(APP_PATH, default_timeout=60)
@@ -34,12 +27,6 @@ def test_dashboard_todas_sin_excepciones() -> None:
     assert any("Series agregadas" in m for m in markdowns)
 
 
-@pytest.mark.skipif(
-    not Path("models/lgbm_h7.pkl").exists()
-    or not Path("data/processed/train_processed.parquet").exists()
-    or not Path("data/predictions/backtest_predictions_h7.parquet").exists(),
-    reason="Artefactos de modelo/datos/backtest no presentes",
-)
 def test_dashboard_familia_sin_excepciones() -> None:
     """Seleccionar una familia renderiza el gráfico con ventana backtest."""
     family_map = _load_family_map()
