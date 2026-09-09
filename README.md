@@ -184,7 +184,7 @@ retrain.py
 | **Versionado datos** | DVC | ⚠️ Pendiente — declarado en requirements pero sin uso en src/ |
 | **Dependencias** | pip-tools | Versiones exactas y reproducibles |
 | **Calidad** | Black + Flake8 + isort | Estilo y linting automático |
-| **Tests** | pytest | 104 tests unitarios/de integración (features, API, Model Registry, SHAP, Optuna, train, retrain, baselines, dashboard y deploy) |
+| **Tests** | pytest | 189 tests (184 unit en CI + 5 integración manual); badge `coverage.svg` |
 
 ---
 
@@ -366,14 +366,23 @@ demand-forecast/
 │       └── seed.py            # Reproducibilidad global
 │
 ├── tests/
-│   ├── test_features.py       # Paridad train/serving del feature engineering
-│   ├── test_api.py            # Contrato HTTP de la API (mockeado)
-│   ├── test_registry.py       # MLflow Model Registry
-│   ├── test_shap.py           # SHAP analysis
-│   ├── test_tune.py           # Optuna tuning
-│   ├── test_retrain.py        # Retrain + params-file propagation
-│   ├── test_train.py          # Train defaults
-│   └── test_baselines.py      # Naive + Seasonal Naive baselines
+│   ├── test_features.py               # Paridad train/serving
+│   ├── test_api.py                     # Contrato HTTP (mock)
+│   ├── test_registry.py               # MLflow Model Registry
+│   ├── test_shap.py                    # SHAP analysis
+│   ├── test_tune.py                    # Optuna tuning
+│   ├── test_retrain.py                 # Retrain + params propagation
+│   ├── test_train.py                   # Train defaults
+│   ├── test_baselines.py              # Naive + Seasonal Naive
+│   ├── test_evaluate_backtest.py      # build_backtest_df (unit)
+│   ├── test_predict_intervals.py      # Confidence intervals (unit)
+│   ├── test_preprocessing.py           # Oil interpolation (unit)
+│   ├── test_deploy_dashboard.py       # Deploy assets (skipif)
+│   ├── test_*_coverage.py             # Coverage tests (3 archivos)
+│   └── integration/                   # ⚠️ Solo manual, excluido de CI
+│       ├── test_dashboard.py          # Dashboard Streamlit (E2E)
+│       ├── test_evaluate_backtest.py  # Parquet + residual_std (E2E)
+│       └── test_predict_intervals.py  # predict_by_store (E2E)
 │
 ├── logs/                      # Logs operacionales (no versionados)
 ├── .env.example               # Variables de entorno de ejemplo
@@ -760,7 +769,7 @@ contribución media absoluta a las predicciones.
 Última actualización: 2026-08-28.
 
 ### Implementado y verificado
-- Pipeline de features stateful con paridad train/serving testada (104 tests).
+- Pipeline de features stateful con paridad train/serving testada (189 tests).
 - Promoción segura en retraining (staging → comparación → producción con backups).
 - `evaluate.py` reconstruyendo features desde el pipeline serializado.
 - Intervalos de confianza calculados en escala log desde las stats históricas completas.
@@ -814,10 +823,11 @@ contribución media absoluta a las predicciones.
   entradas nuevas), `mlruns/` des-trackeado (108 archivos, .gitignore ya
   lo cubría), `demand_forecast.egg-info/` eliminado.
 - **Test coverage:** `pytest-cov` (81%), badge `coverage.svg` en README,
-  CI gate `--cov-fail-under=80`. Tests: 189/189 passed. Coverage
-  determinístico en CI con tests unitarios genuinos (sin mocks de
-  orquestación): ingestion 100%, preprocessing 89%, predict 97%
-  (local) / 66% (CI, sin artefactos gitignored).
+  CI gate `--cov-fail-under=80`. Tests de integración separados a
+  `tests/integration/` (excluidos de CI con `--ignore`). 189 tests
+  local (184 unit + 5 integración), CI 184 passed / 0 skipped,
+  coverage CI 80.56%. Unit tests genuinos: ingestion 100%,
+  preprocessing 89%, predict 97% (local) / 66% (CI).
 
 ### v0.6.1 (2026-09-06)
 - **Optuna espacio anti-overfit:** `suggest_params` unificado para h7/h30

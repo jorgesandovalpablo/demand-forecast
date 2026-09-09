@@ -143,3 +143,42 @@ limpio sin gitignored). Gate `--cov-fail-under=80` pasa.
 `prepare_prediction_data`. La cobertura de orquestación es honestamente
 integración (requiere artefactos). Si quedamos en ~77%, se baja el gate
 a la cifra real — nunca se forza mockeando glue.
+
+## Tests de integración separados (commit `331fe4f`)
+
+**Problema:** 5 tests dependían de artefactos gitignored (`models/*.pkl`,
+`data/processed/*.parquet`). En CI (checkout limpio) se saltaban
+(`5 skipped`), lo que hacía que el conteo de tests y coverage fueran
+inconsistentes entre local y CI.
+
+**Solución:** separar tests de integración en `tests/integration/` y
+excluirlos del CI con `--ignore`.
+
+### Archivos movidos/creados
+
+| Archivo | Tests | Origen |
+|---|---|---|
+| `tests/integration/test_dashboard.py` | 2 (familia + agregada) + helper | Movido completo desde `tests/test_dashboard.py` |
+| `tests/integration/test_evaluate_backtest.py` | 2 (parquet columnas + residual_std) | Split de `tests/test_evaluate_backtest.py` |
+| `tests/integration/test_predict_intervals.py` | 1 (end-to-end predict_by_store) | Split de `tests/test_predict_intervals.py` |
+
+### Qué cambió
+- Eliminados los 5 `@pytest.mark.skipif` (ya no necesarios — solo corren explícito)
+- `ci.yml`: `pytest tests/ ... --ignore=tests/integration`
+- `tests/test_evaluate_backtest.py`: queda con 3 unit tests puros
+- `tests/test_predict_intervals.py`: queda con 5 unit tests puros
+- `tests/test_dashboard.py`: eliminado (movido completo a integration)
+
+### Conteos
+
+| Entorno | Tests | Coverage | Gate 80% |
+|---|---|---|---|
+| Local (full) | **189 passed, 0 skipped** (184 unit + 5 integración) | 84% | ✅ |
+| CI (`--ignore=tests/integration`) | **184 passed, 0 skipped** | **80.56%** | ✅ |
+
+### Cómo correr
+```bash
+pytest tests/                                    # todo (unit + integración)
+pytest tests/ --ignore=tests/integration          # solo unit (CI)
+pytest tests/integration/                         # solo integración (manual)
+```
