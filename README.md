@@ -992,8 +992,8 @@ contribución media absoluta a las predicciones.
 **Jorge Sandoval** — ML Engineer
 
 - GitHub: [@jorgesandovalpablo](https://github.com/jorgesandovalpablo)
-- LinkedIn: [jorgesandovalpablo](https://linkedin.com/in/jorgesandovalpablo)
-- Email: jorgesandovalpablo@gmail.com
+- LinkedIn: [jorgesandovalpablo](https://linkedin.com/in/jorge-alejandro-sandoval-pablo)
+- Email: jorge.sandoval.pablo@gmail.com
 
 > Apasionado por transformar datos en decisiones de negocio medibles.
 > Este proyecto demuestra un pipeline de ML production-grade:
