@@ -13,6 +13,7 @@
 ![Docker](https://img.shields.io/badge/deploy-Docker-blue)
 ![Streamlit](https://img.shields.io/badge/demo-Streamlit-red)
 [![Streamlit Community Cloud](https://img.shields.io/badge/Demo-Streamlit%20Community%20Cloud-red?logo=streamlit&logoColor=white)](https://demand-forecast-minimarket.streamlit.app)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
 
