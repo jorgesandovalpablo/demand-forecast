@@ -5,6 +5,7 @@
 > FastAPI deployment y retraining con promoción segura (cron semanal vía GitHub Actions).
 
 ![CI](https://github.com/jorgesandovalpablo/demand-forecast/actions/workflows/ci.yml/badge.svg)
+![Coverage](coverage.svg)
 ![Python](https://img.shields.io/badge/python-3.13-blue)
 ![LightGBM](https://img.shields.io/badge/model-LightGBM-green)
 ![FastAPI](https://img.shields.io/badge/api-FastAPI-teal)
@@ -812,7 +813,8 @@ contribución media absoluta a las predicciones.
   ("Alejandro" → "Jorge Sandoval"), TOC del README corregido (orden + 5
   entradas nuevas), `mlruns/` des-trackeado (108 archivos, .gitignore ya
   lo cubría), `demand_forecast.egg-info/` eliminado.
-- Tests: 104/104 passed.
+- **Test coverage:** `pytest-cov` (81%), badge `coverage.svg` en README,
+  CI gate `--cov-fail-under=80`. Tests: 147/147 passed.
 
 ### v0.6.1 (2026-09-06)
 - **Optuna espacio anti-overfit:** `suggest_params` unificado para h7/h30

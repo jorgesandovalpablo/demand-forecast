@@ -30,4 +30,4 @@ jobs:
         run: flake8 --select=F src/ tests/
 
       - name: Run tests
-        run: pytest tests/ -v --tb=short
+        run: pytest tests/ -v --tb=short --cov=src --cov-fail-under=80
