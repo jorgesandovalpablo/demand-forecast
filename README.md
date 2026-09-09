@@ -27,9 +27,14 @@
 - [Reproducir el proyecto](#-reproducir-el-proyecto)
 - [API](#-api)
 - [Decisiones de diseño](#-decisiones-de-diseño)
-- [Interpretabilidad (SHAP)](#-interpretabilidad-shap)
 - [Hallazgos del EDA](#-hallazgos-del-eda)
+- [Experimentos en MLflow](#-experimentos-en-mlflow)
+- [Model Registry (DagsHub)](#-model-registry-dagshub)
+- [Interpretabilidad (SHAP)](#-interpretabilidad-shap)
+- [Estado actual y limitaciones](#-estado-actual-y-limitaciones)
+- [CHANGELOG](#-changelog)
 - [Autor](#-autor)
+- [Licencia](#-licencia)
 
 ---
 

@@ -2,7 +2,7 @@
 # Etapa 1 — Builder
 # Instala dependencias en una imagen temporal
 # ─────────────────────────────────────────
-FROM python:3.12-slim AS builder
+FROM python:3.13-slim AS builder
 
 # Evita que Python genere archivos .pyc
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -29,7 +29,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 # Etapa 2 — Runtime
 # Imagen final 
 # ─────────────────────────────────────────
-FROM python:3.12-slim  AS runtime
+FROM python:3.13-slim  AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -45,8 +45,8 @@ RUN useradd --create-home --shell /bin/bash appuser
 WORKDIR /app
 
 # Copiar librerías instaladas del builder
-COPY --from=builder /usr/local/lib/python3.12/site-packages \
-                    /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/lib/python3.13/site-packages \
+                    /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin \
                     /usr/local/bin
 
