@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 CATEGORICAL_FEATURES = [
     'family', 'city', 'state',
     'type', 'cluster', 'holiday_type',
-    'holiday_impact_type'
+    'holiday_impact_type',
 ]
 
 class DemandFeatureEngineer:
@@ -100,7 +100,15 @@ class DemandFeatureEngineer:
             if col in df.columns:
                 # Se fuerza a usar exactamente las categorías aprendidas
                 df[col] = pd.Categorical(df[col], categories=categories).codes.astype('int16')
-        
+
+        # Columnas que LightGBM espera como category dtype (no int16)
+        # durante predict. Se fijan categorías para paridad con entrenamiento.
+        if 'holiday_locale' in df.columns:
+            df['holiday_locale'] = pd.Categorical(
+                df['holiday_locale'],
+                categories=['Local', 'National', 'Regional'],
+            )
+
         if 'transferred' in df.columns:
             df['transferred'] = df['transferred'].astype(bool)
 
@@ -170,7 +178,11 @@ class DemandFeatureEngineer:
                 if keyword.lower() in description.lower(): return 'negative'
             return 'neutral'
 
-        df['holiday_impact_type'] = df['holiday_description'].apply(classify_holiday).astype('category')
+        IMPACT_CATEGORIES = ['atypical', 'negative', 'neutral', 'none', 'positive']
+        df['holiday_impact_type'] = pd.Categorical(
+            df['holiday_description'].apply(classify_holiday),
+            categories=IMPACT_CATEGORIES,
+        )
 
         festivos_dates = pd.to_datetime(df[df['es_festivo'] == 1]['date'].unique())
         daily_dates = df['date'].drop_duplicates().sort_values()

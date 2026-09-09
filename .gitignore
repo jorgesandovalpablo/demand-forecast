@@ -224,6 +224,9 @@ data/processed/
 data/predictions/
 notebooks/figures/*_store*.png
 
+# Demo assets (generados por build_demo_bundle.py)
+deploy/assets/models/
+
 #logs 
 logs/
 

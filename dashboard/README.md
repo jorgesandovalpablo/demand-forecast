@@ -1,11 +1,14 @@
 # 🖥️ Demand Forecast — Dashboard interactivo
 
-Demo en vivo del sistema de forecasting de demanda para 54 minimercados en
-Ecuador, publicada en **HuggingFace Spaces**.
+Demo interactiva del sistema de forecasting de demanda para 54 minimercados en
+Ecuador.
 
-El dashboard importa directamente la librería de predicción del pipeline
-(`src/models/predict.py`), de modo que lo que se muestra es **exactamente el
-mismo modelo** que sirve la API FastAPI. Paridad garantizada por diseño.
+**Dos versiones disponibles:**
+
+| Versión | Archivo | Uso |
+|---|---|---|
+| **Local** | `dashboard/app.py` | Requiere `src/` instalado (paridad con API) |
+| **Community Cloud** | `deploy/app.py` | Autocontenida, sin dependencias de `src/` |
 
 ## ✨ Funcionalidades
 
@@ -14,7 +17,8 @@ mismo modelo** que sirve la API FastAPI. Paridad garantizada por diseño.
 - **Selector de tienda / horizonte / familia:** explora las 54 tiendas, los
   horizontes de 7 y 30 días, y las 33 familias de productos.
 - **Gráfico interactivo (Plotly):** serie temporal de la predicción con
-  intervalo de confianza (configurable via `confidence.z` en config.yaml), o top 8 familias por volumen.
+  intervalo de confianza (configurable via `confidence.z` en config.yaml),
+  ventana de backtest (real vs predicción), o top 8 familias por volumen.
 - **Tabla de detalle:** predicción por fecha con límites inferior y superior.
 
 ## 🚀 Ejecutar en local
@@ -31,53 +35,36 @@ streamlit run dashboard/app.py
 
 Abre `http://localhost:8501`.
 
-## ☁️ Publicar en HuggingFace Spaces
+## ☁️ Streamlit Community Cloud
 
-### 1. Crear el Space
+La demo en vivo corre en [Streamlit Community Cloud](https://share.streamlit.io).
+El archivo `deploy/app.py` es autocontenido: lee assets pre-calculados
+(parquets de predicciones, métricas, backtest) sin importar `src/`.
 
-- [huggingface.co/new-space](https://huggingface.co/new-space)
-- SDK: **Streamlit** · Hardware: **CPU basic**
-- Clónalo en local, p. ej. `~/demand-forecast-demo`.
+### Deploy
 
-### 2. Sincronizar código y artefactos
+1. Push a `main` → auto-redeploy en ~1-2 min
+2. URL: `https://demand-forecast-minimarket.streamlit.app`
 
-```bash
-HF_SPACE_DIR=~/demand-forecast-demo bash scripts/sync_hf_space.sh
-cd ~/demand-forecast-demo && git push
-```
-
-El script:
-- Copia `src/`, `dashboard/`, `configs/` y los artefactos (modelos, datos).
-- Pone `app.py` y `requirements.txt` en la raíz del Space (Streamlit lo espera así).
-- Versiona los binarios grandes con **git LFS** (`models/*.pkl`, `*.parquet`, `*.csv`).
-
-> Sin secretos: el Space es autocontenido, no necesita DagsHub/MLflow.
-
-### 3. Alternativa: publicar con HF CLI
+### Regenerar assets
 
 ```bash
-pip install -U huggingface_hub
-export HF_TOKEN=tu_token
-python - <<'EOF'
-from huggingface_hub import HfApi
-api = HfApi()
-api.upload_folder(
-    repo_id="TU_USUARIO/demand-forecast-demo",
-    folder_path="~/demand-forecast-demo",
-    repo_type="space",
-)
-EOF
+./venv/bin/python scripts/build_demo_bundle.py
+git add deploy/assets/
+git commit -m "chore: regenerar assets demo"
+git push
 ```
-
-> Los artefactos superan 10MB, por lo que conviene usar git LFS o
-> `upload_large_files=True` en `upload_folder`.
 
 ## 🧩 Estructura
 
 ```
 dashboard/
-├── app.py             # Código Streamlit
-└── requirements.txt   # Dependencias
+├── app.py             # Dashboard local (requiere src/)
+└── requirements.txt   # Dependencias del dashboard local
+deploy/
+├── app.py             # Dashboard autocontenido (Community Cloud)
+├── requirements.txt   # Dependencias fijas
+└── assets/            # Assets pre-calculados (generados, no commitear modelos)
 scripts/
-└── sync_hf_space.sh   # Sync del Space
+└── build_demo_bundle.py  # Genera assets para deploy/
 ```
