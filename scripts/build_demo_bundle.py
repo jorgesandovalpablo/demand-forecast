@@ -2,10 +2,10 @@
 # scripts/build_demo_bundle.py
 """Materializa assets para la demo de Streamlit Community Cloud.
 
-Pre-calcula predicciones con predict_by_store (paridad real con el
-pipeline de entrenamiento) para cada tienda x horizonte y las escribe
-como parquet en deploy/assets/predictions/. Tambien genera
-stores.json, families.json, copia backtest + metricas y modelos.
+Pre-calcula predicciones con predict() (paridad real con el pipeline de
+entrenamiento) para cada tienda x horizonte y las escribe como parquet
+en deploy/assets/predictions/. Tambien genera stores.json, families.json,
+copia backtest + metricas.
 """
 
 import json
@@ -19,30 +19,9 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parent.parent
 ASSETS = ROOT / "deploy" / "assets"
 PRED_DIR = ASSETS / "predictions"
-MODELS_DIR = ASSETS / "models"
 HORIZONS = [7, 30]
 METRICS_PATTERN = "data/predictions/global_metrics_h{h}.parquet"
 BACKTEST_PATTERN = "data/predictions/backtest_predictions_h{h}.parquet"
-MODEL_FILES = [
-    "lgbm_h{h}.pkl",
-    "features_h{h}.pkl",
-    "feature_pipeline_h{h}.pkl",
-    "residual_std_h{h}.pkl",
-]
-
-
-def _copy_model_artifacts() -> None:
-    """Copia modelos, features y pipeline a deploy/assets/models/."""
-    MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    for h in HORIZONS:
-        for tpl in MODEL_FILES:
-            src = ROOT / "models" / tpl.format(h=h)
-            dst = MODELS_DIR / src.name
-            if src.exists():
-                shutil.copy2(src, dst)
-                print(f"  [models] {src.name}")
-            else:
-                print(f"  [models] SKIP {src.name} (no existe)")
 
 
 def _copy_backtest_and_metrics() -> None:
@@ -79,7 +58,6 @@ def build() -> None:
     print("=== Build demo bundle ===")
 
     from src.models.predict import predict, ModelRegistry
-    from src.utils.config import config
 
     # Cargar historial procesado
     proc_path = ROOT / "data" / "processed" / "train_processed.parquet"
@@ -126,11 +104,9 @@ def build() -> None:
             f"({len(stores)} tiendas)"
         )
 
-    # Copiar backtest, metricas y modelos
+    # Copiar backtest y metricas
     print("\nCopiando backtest y metricas...")
     _copy_backtest_and_metrics()
-    print("\nCopiando modelos...")
-    _copy_model_artifacts()
 
     # Resumen de tamano
     total_bytes = sum(f.stat().st_size for f in ASSETS.rglob("*") if f.is_file())

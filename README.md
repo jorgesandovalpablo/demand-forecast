@@ -1,4 +1,3 @@
-# demand-
 # 🛒 Demand Forecast — Retail Time Series
 
 > Pipeline de ML end-to-end para predicción de demanda en minimercados de Ecuador.
@@ -12,7 +11,7 @@
 ![MLflow](https://img.shields.io/badge/tracking-MLflow-orange)
 ![Docker](https://img.shields.io/badge/deploy-Docker-blue)
 ![Streamlit](https://img.shields.io/badge/demo-Streamlit-red)
-[![HuggingFace](https://img.shields.io/badge/Demo-vivo-yellow?logo=huggingface&logoColor=white)](<SPACE_URL>)
+[![Streamlit Community Cloud](https://img.shields.io/badge/Demo-Streamlit%20Community%20Cloud-red?logo=streamlit&logoColor=white)](https://demand-forecast-minimarket.streamlit.app)
 
 ---
 
@@ -179,7 +178,7 @@ retrain.py
 | **Versionado datos** | DVC | ⚠️ Pendiente — declarado en requirements pero sin uso en src/ |
 | **Dependencias** | pip-tools | Versiones exactas y reproducibles |
 | **Calidad** | Black + Flake8 + isort | Estilo y linting automático |
-| **Tests** | pytest | 73 tests unitarios/de integración (features, API, Model Registry, SHAP, Optuna, train, retrain y baselines) |
+| **Tests** | pytest | 104 tests unitarios/de integración (features, API, Model Registry, SHAP, Optuna, train, retrain, baselines, dashboard y deploy) |
 
 ---
 
@@ -277,18 +276,19 @@ Explora el modelo de forma interactiva: selecciona tienda, horizonte y familia
 para ver predicciones con intervalos de confianza, métricas del modelo y
 gráficos dinámicos.
 
-[![Abrir demo](https://img.shields.io/badge/Abrir%20Demo-HuggingFace-yellow?logo=huggingface&logoColor=white)](<SPACE_URL>)
+[![Abrir demo](https://img.shields.io/badge/Abrir%20Demo-Streamlit-red?logo=streamlit&logoColor=white)](https://demand-forecast-minimarket.streamlit.app)
 
-> El dashboard importa directamente la librería de predicción del pipeline
-> (`src/models/predict.py`), garantizando que lo que ves es exactamente el
-> modelo que sirve la API. Correrlo en local:
+> El dashboard despliegado en Streamlit Community Cloud es autocontenido
+> (lee assets pre-calculados de `deploy/assets/`). El dashboard local
+> (`dashboard/app.py`) importa directamente `src/models/predict.py`,
+> garantizando paridad total con la API. Correrlo en local:
 
 ```bash
 pip install -r dashboard/requirements.txt
 streamlit run dashboard/app.py
 ```
 
-> Para reproducir el Space: `scripts/sync_hf_space.sh`.
+> Para la demo en Community Cloud: `python scripts/build_demo_bundle.py` → push a main.
 
 ---
 
@@ -306,12 +306,18 @@ demand-forecast/
 │   └── config.yaml              # Fuente de verdad única del proyecto
 │
 ├── dashboard/
-│   ├── app.py                   # Demo Streamlit (KPIs + gráficos + predicción)
-│   ├── requirements.txt         # Dependencias del dashboard
-│   └── README.md                # Guía del Space de HuggingFace
+│   ├── app.py                   # Demo Streamlit local (requiere src/)
+│   ├── requirements.txt         # Dependencias del dashboard local
+│   └── README.md                # Guía del dashboard local
+│
+├── deploy/
+│   ├── app.py                   # Demo autocontenida (Streamlit Community Cloud)
+│   ├── requirements.txt         # Dependencias fijas para Community Cloud
+│   └── assets/                  # Assets pre-calculados (generados por build_demo_bundle.py)
 │
 ├── scripts/
-│   └── sync_hf_space.sh         # Publica el dashboard + artefactos al Space
+│   ├── build_demo_bundle.py     # Genera assets para deploy/
+│   └── sync_hf_space.sh         # (obsoleto) Publica el dashboard al Space
 │
 ├── data/
 │   ├── raw/                     # CSV originales — nunca se modifican
@@ -498,6 +504,19 @@ curl http://localhost:8000/health
 ```bash
 pytest tests/ -v --tb=short
 ```
+
+### 8. Demo Streamlit Community Cloud
+
+```bash
+# Generar assets pre-calculados (predicciones, backtest, métricas)
+python scripts/build_demo_bundle.py
+
+# Probar localmente
+pip install -r deploy/requirements.txt
+streamlit run deploy/app.py
+```
+
+Para desplegar: push a `main` → auto-redeploy en Community Cloud.
 
 ---
 
@@ -735,7 +754,7 @@ contribución media absoluta a las predicciones.
 Última actualización: 2026-08-28.
 
 ### Implementado y verificado
-- Pipeline de features stateful con paridad train/serving testada (73 tests).
+- Pipeline de features stateful con paridad train/serving testada (104 tests).
 - Promoción segura en retraining (staging → comparación → producción con backups).
 - `evaluate.py` reconstruyendo features desde el pipeline serializado.
 - Intervalos de confianza calculados en escala log desde las stats históricas completas.
@@ -761,6 +780,29 @@ contribución media absoluta a las predicciones.
 ---
 
 ## 📝 CHANGELOG
+
+### v0.7.0 (2026-09-08)
+- **Demo Streamlit Community Cloud:** nuevo `deploy/app.py` autocontenido
+  (0 imports de src/) con assets pre-calculados. `scripts/build_demo_bundle.py`
+  genera predicciones por tienda/horizonte, backtest, métricas y metadata.
+  Despliegue en share.streamlit.io con auto-redeploy.
+- **Fix categorical_feature mismatch:** 3 bugs corregidos en
+  `src/features/build_features.py` que causaban errores al predecir con
+  subconjuntos de datos:
+  - `holiday_impact_type` con categorías auto-derivadas por subset →
+    hardcodeadas con `IMPACT_CATEGORIES`.
+  - `holiday_locale` perdía dtype category durante encoding → se
+    reconstruye como `pd.Categorical` explícito.
+  - `predict_by_store()` por tienda causaba DataFrame de test vacío →
+    `build_demo_bundle.py` usa `predict()` una vez por horizonte.
+- **Bundle optimizado:** eliminados modelos .pkl innecesarios del bundle
+  (41MB → ~5MB). `deploy/app.py` solo necesita parquets y JSONs.
+- **Fix heading README:** eliminado `# demand-` duplicado.
+- **Fix README URLs:** placeholders `<SPACE_URL>` reemplazados por URLs
+  reales de Streamlit Community Cloud.
+- **dashboard/README.md actualizado:** referencias de HuggingFace Spaces
+  a Streamlit Community Cloud.
+- Tests: 104/104 passed.
 
 ### v0.6.1 (2026-09-06)
 - **Optuna espacio anti-overfit:** `suggest_params` unificado para h7/h30

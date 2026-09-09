@@ -14,7 +14,6 @@ import streamlit as st
 
 ASSETS = Path(__file__).parent / "assets"
 PRED_DIR = ASSETS / "predictions"
-MODELS_DIR = ASSETS / "models"
 HORIZONS = [7, 30]
 
 st.set_page_config(
