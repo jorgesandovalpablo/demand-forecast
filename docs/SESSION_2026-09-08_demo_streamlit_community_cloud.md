@@ -97,11 +97,11 @@ Suite completa: 104/104 passed (incluye 5 nuevos en test_deploy_dashboard.py).
 - **Repo:** jorgesandovalpablo/demand-forecast
 - **Main file:** deploy/app.py
 - **Python:** 3.11 o 3.12
-- **URL esperada:** demand-forecast-minimarket.streamlit.app
+- **URL desplegada:** https://demand-forecast-minimarket.streamlit.app (en vivo)
 - **Ciclo:** retrain → build_demo_bundle.py → commit → push → auto-redeploy
 
-## Pendiente
+## Estado (post-deploy)
 
-- README.md: placeholders `<SPACE_URL>` en L15 y L280 (actualizar con URL de Community Cloud)
-- README.md: heading L1 roto `# demand-` (duplicado)
-- dashboard/README.md: actualizar referencias de HuggingFace Spaces a Streamlit Community Cloud
+- ✅ **URL desplegada:** https://demand-forecast-minimarket.streamlit.app
+- ✅ **README.md:** placeholders `<SPACE_URL>` reemplazados, heading L1 corregido
+- ✅ **dashboard/README.md:** referencias de HuggingFace Spaces migradas a Community Cloud
