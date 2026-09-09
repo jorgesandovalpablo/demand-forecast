@@ -118,3 +118,28 @@ Suite completa: 104/104 passed (incluye 5 nuevos en test_deploy_dashboard.py).
 - **demand_forecast.egg-info/** eliminado del disco
 - **Docs locales:** baselines marcado RESUELTO (resume, PROJECT_KNOWLEDGE,
   handoff), secrets GitHub Actions confirmados ✅
+
+## Coverage CI determinístico (commit `e4a9c0d`→`55bdd59`→`HEAD`)
+
+**Causa raíz:** CI fallaba coverage (71%) porque 5 tests se saltaban
+(sin `models/*.pkl`, `data/*.parquet`, `data/*.csv` en checkout limpio).
+Los módulos `ingestion.py` (17%→), `preprocessing.py` (36%→) y
+`predict.py` (33%→) perdían cobertura masivamente.
+
+**Solución (solo unit genuino, sin forzar):**
+- `tests/test_ingestion_coverage.py` (11 tests): validación, load con
+  CSVs sintéticos en `tmp_path`. **ingestion 100% CI.**
+- `tests/test_preprocessing_coverage.py` (13 tests): holidays, merge,
+  nulls, target, memory, run_preprocessing con datos sintéticos.
+  **preprocessing 89% CI.**
+- `tests/test_predict_coverage.py` (18 tests): ModelRegistry borde,
+  _load_residual_std fallback, save_predictions, cache, predict_by_store
+  error. **predict 66% CI** (orquestación = integración, no forzada).
+
+**Resultado:** 189 tests, flake8 0 errores, coverage **81%** (worktree
+limpio sin gitignored). Gate `--cov-fail-under=80` pasa.
+
+**Regla aplicada:** No se mockeó la cadena completa de `predict()`/
+`prepare_prediction_data`. La cobertura de orquestación es honestamente
+integración (requiere artefactos). Si quedamos en ~77%, se baja el gate
+a la cifra real — nunca se forza mockeando glue.

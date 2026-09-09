@@ -814,7 +814,10 @@ contribución media absoluta a las predicciones.
   entradas nuevas), `mlruns/` des-trackeado (108 archivos, .gitignore ya
   lo cubría), `demand_forecast.egg-info/` eliminado.
 - **Test coverage:** `pytest-cov` (81%), badge `coverage.svg` en README,
-  CI gate `--cov-fail-under=80`. Tests: 147/147 passed.
+  CI gate `--cov-fail-under=80`. Tests: 189/189 passed. Coverage
+  determinístico en CI con tests unitarios genuinos (sin mocks de
+  orquestación): ingestion 100%, preprocessing 89%, predict 97%
+  (local) / 66% (CI, sin artefactos gitignored).
 
 ### v0.6.1 (2026-09-06)
 - **Optuna espacio anti-overfit:** `suggest_params` unificado para h7/h30
