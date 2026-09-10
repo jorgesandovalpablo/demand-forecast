@@ -40,22 +40,17 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Download dataset from Kaggle
-        if: ${{ vars.KAGGLE_DOWNLOAD_ENABLED == 'true' }}
+      - name: Restore dataset from DVC (DagsHub storage)
         env:
-          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
-          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
-        run: |
-          mkdir -p data/raw
-          kaggle competitions download \
-            -c store-sales-time-series-forecasting \
-            -p data/raw --unzip
+          AWS_ACCESS_KEY_ID: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.MLFLOW_TRACKING_PASSWORD }}
+        run: dvc pull
 
       - name: Verify raw data availability
         id: data_check
         run: |
           if [ ! -f data/raw/train.csv ]; then
-            echo "::warning::data/raw/train.csv no disponible. Configura el repo variable KAGGLE_DOWNLOAD_ENABLED=true y los secrets KAGGLE_USERNAME/KAGGLE_KEY."
+            echo "::warning::data/raw/train.csv no disponible. Verifica que dvc pull fue exitoso (requiere secrets MLFLOW_TRACKING_USERNAME/PASSWORD para autenticar con DagsHub)."
             echo "available=false" >> "$GITHUB_OUTPUT"
           else
             echo "available=true" >> "$GITHUB_OUTPUT"
