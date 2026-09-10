@@ -9,7 +9,7 @@ uvicorn
 pydantic
 pyyaml
 optuna
-dvc
+dvc[s3]
 joblib
 pytest
 pytest-cov

@@ -441,7 +441,15 @@ MLFLOW_TRACKING_USERNAME=tu_usuario_dagshub
 MLFLOW_TRACKING_PASSWORD=tu_token_dagshub
 ```
 
-### 4. Descargar el dataset
+### 4. Obtener el dataset
+
+**Opción A — DVC (recomendado, dataset versionado):**
+
+```bash
+dvc pull                           # descarga data/raw/ desde DagsHub storage
+```
+
+**Opción B — Kaggle (manual):**
 
 Dataset disponible en Kaggle:
 [Store Sales - Time Series Forecasting](https://www.kaggle.com/competitions/store-sales-time-series-forecasting)

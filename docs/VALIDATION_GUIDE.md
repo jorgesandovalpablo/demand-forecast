@@ -5,7 +5,7 @@ stateful y la promoción segura de modelos, y capturar las métricas
 definitivas para el README.
 
 Requisitos previos:
-- Dataset en `data/raw/` (Kaggle: *Store Sales - Time Series Forecasting*).
+- Dataset en `data/raw/`: `dvc pull` (requiere auth en `.env`) o descargar manualmente de Kaggle (*Store Sales - Time Series Forecasting*).
 - `.env` con credenciales DagsHub (`MLFLOW_TRACKING_USERNAME/PASSWORD`).
 - Ejecutar desde la raíz del proyecto con el venv activado.
 
