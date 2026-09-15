@@ -74,7 +74,7 @@ flowchart TB
     classDef serve fill:#2a1a3a,stroke:#9c27b0,color:#f3e5f5
 
     subgraph DATA[" DATA"]
-        A1["Kaggle Store Sales — 4.5 años,\n3M registros"]
+        A1["Kaggle Store Sales —\n 4.5 años,3M registros"]
         A2["DagsHub Storage —\n versionado con DVC"]
         A1 --> A2
     end
@@ -101,7 +101,7 @@ flowchart TB
     end
 
     subgraph SERVE[" SERVING"]
-        D1["predict.py —\n .transform() con pipeline congelado"]
+        D1["predict.py —\n .transform() con pipeline\ncongelado"]
         D2["FastAPI —\n POST /predict · GET /metrics · /health"]
         D3["Streamlit Demo —\n predicciones + IC + backtest"]
         D1 --> D2
