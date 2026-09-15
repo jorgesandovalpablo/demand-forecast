@@ -20,8 +20,7 @@
 ## 📋 Tabla de contenidos
 
 - [Problema de negocio](#-problema-de-negocio)
-- [Solución](#-solución)
-- [Arquitectura del pipeline](#-arquitectura-del-pipeline)
+- [Solución (pipeline y arquitectura)](#-solución)
 - [Stack tecnológico](#-stack-tecnológico)
 - [Resultados](#-resultados)
 - [Demo en vivo](#-demo-en-vivo)
@@ -67,80 +66,43 @@ El equipo de cadena de suministro requiere dos horizontes de predicción:
 Pipeline de ML end-to-end con dos modelos LightGBM especializados por horizonte,
 entrenados sobre **1,782 series temporales simultáneas** (54 tiendas × 33 familias):
 
-```
-Datos históricos (4.5 años — 3,000,888 registros)
-        │
-        ▼
-Feature Engineering (~50 features por horizonte)
-  ├── Lags temporales respetando horizonte
-  ├── Rolling statistics con shift correcto
-  ├── Festivos clasificados por impacto
-  ├── Promociones y transacciones
-  └── Precio del petróleo (correlación -0.75)
-        │
-        ▼
-LightGBM Global — modelo único para todas las series
-  ├── Modelo diario  (horizon=7)  → D+1 a D+7
-  └── Modelo mensual (horizon=30) → M+1 a M+3
-        │
-        ▼
-FastAPI REST API → Equipo de cadena de suministro
-```
+```mermaid
+flowchart TB
+    subgraph DATA["Datos"]
+        A["Kaggle Store Sales<br/>4.5 años — 3,000,888 registros"] --> B["data/raw/"]
+        B -->|"dvc add + dvc push"| C["DagsHub storage<br/>remote s3://dvc"]
+        C -.->|"dvc pull"| B
+    end
 
----
+    subgraph TRAIN["Entrenamiento"]
+        B --> D["preprocessing.py<br/>merge 6 CSVs, nulos, log1p"]
+        D --> E["train_processed.parquet"]
+        E --> F["DemandFeatureEngineer<br/>fit() — categorías, store_stats<br/>transform() — lags, rolling, festivos, promo, transacciones<br/>(~50 features, en memoria)"]
+        F --> G["Walk-forward CV<br/>5 folds · 4 semanas"]
+        G --> H["train.py + MLflow<br/>LightGBM global h7 y h30"]
+        H --> I["lgbm_h{h}.pkl<br/>feature_pipeline_h{h}.pkl"]
+    end
 
-## 🏗️ Arquitectura del pipeline
+    subgraph OPS["CI/CD & MLOps"]
+        I --> J["Model Registry<br/>MLflow / DagsHub<br/>alias @production"]
+        K["retrain.yml<br/>cron semanal · workflow_dispatch"] -->|"dvc pull"| C
+        K --> L["retrain.py<br/>staging → test set (8 sem) → comparación 1% MAE"]
+        L -->|"mejora ≥ 1%"| M["promueve + backup<br/>3 artefactos rotados"]
+        L -->|"< 1% mejora"| N["descarta staging"]
+        M --> J
+    end
 
-```
-data/raw/ (CSV originales)
-        │
-        ▼
-ingestion.py          → Carga + validación de esquema
-        │
-        ▼
-preprocessing.py      → Merge correcto de 6 archivos
-                         Tratamiento de nulos
-                         log1p al target
-                         Optimización de memoria
-        │
-        ▼
-data/processed/train_processed.parquet
-        │
-        ├──────────────────────────────────────┐
-        ▼                                      ▼
-DemandFeatureEngineer(horizon=7)   DemandFeatureEngineer(horizon=30)
-  fit(): categorías, store_stats,    fit(): ídem
-         ranking global
-  transform(): lags, rolling,
-  festivos, promo, transacciones
-  (en memoria — sin parquet intermedio)
-        │                                      │
-        ▼                                      ▼
-validation.py                    validation.py
-walk-forward CV (5 folds)        walk-forward CV (5 folds)
-        │                                      │
-        ▼                                      ▼
-train.py + MLflow                train.py + MLflow
-lgbm_h7.pkl                      lgbm_h30.pkl
-features_h7.pkl                  features_h30.pkl
-feature_pipeline_h7.pkl          feature_pipeline_h30.pkl
-        │                                      │
-        └─────────────────┬────────────────────┘
-                          ▼
-                  predict.py / evaluate.py
-                  (cargan el pipeline serializado
-                   con .transform() → paridad garantizada)
-                          │
-                          ▼
-                  FastAPI (main.py)
-                  POST /predict
+    subgraph SERV["Serving"]
+        I --> O["predict.py · evaluate.py<br/>.transform() con pipeline serializado<br/>(paridad train/serving garantizada)"]
+        O --> P["FastAPI<br/>POST /predict · /health"]
+    end
 ```
 
-> **Cambio clave:** las features ya no se persisten en parquets
-> intermedios (`train_features_d*.parquet`). El `DemandFeatureEngineer`
-> aprende su estado en `fit()` durante el entrenamiento y se serializa
-> junto al modelo; serving y evaluación reconstruyen features con
-> `.transform()` sobre ese estado congelado.
+> **Paridad train/serving:** el `DemandFeatureEngineer` se ajusta (`fit()`) una
+> sola vez durante el entrenamiento y se serializa junto al modelo. Tanto la
+> evaluación como la inferencia reconstruyen features con `.transform()` sobre
+> ese estado congelado, garantizando la misma representación sin parquets
+> intermedios.
 
 <p align="center">
   <img src="notebooks/figures/cv_folds_h7.png" width="45%" alt="CV Folds h7" />
@@ -148,26 +110,6 @@ feature_pipeline_h7.pkl          feature_pipeline_h30.pkl
   <img src="notebooks/figures/cv_folds_h30.png" width="45%" alt="CV Folds h30" />
 </p>
 <p align="center"><em>Walk-forward CV: 5 folds con ventana de validación de 4 semanas cada uno</em></p>
-
-
-**Pipeline de reentrenamiento automático:**
-
-```
-Disparo manual o programado (cron semanal: lunes 06:00 UTC vía GitHub Actions)
-        │
-        ▼
-retrain.py
-  ├── Ejecuta pipeline completo a STAGING (_new)
-  ├── Producción NUNCA se toca durante el entrenamiento
-  ├── Evalúa el nuevo modelo sobre el test set (8 semanas)
-  ├── Compara métricas (threshold 1% mejora en MAE)
-  ├── Si mejora → promueve los 3 artefactos con backup timestamped
-  └── Si no mejora → descarta staging, mantiene producción
-              │
-              ▼
-        MLflow registra versión
-        Backups en models/*_backup_*.pkl (retención: 3)
-```
 
 ---
 
@@ -812,6 +754,7 @@ contribución media absoluta a las predicciones.
   Remote endpoint: `dagshub.com/jorgesandovalpablo/demand-forecast.s3`.
 - **dvc-s3:** añadido a `requirements.txt` (dependencia S3 para DVC).
 - **CI retrain:** dataset restaurado con `dvc pull` desde DagsHub storage en `retrain.yml` (reemplaza descarga Kaggle).
+- **Diagrama de arquitectura:** diagrama Mermaid único consolidado que reemplaza 3 bloques ASCII (pipeline, features, reentrenamiento).
 - **pyproject.toml:** versión 0.7.0 → 0.8.0.
 
 ### v0.7.0 (2026-09-08)
