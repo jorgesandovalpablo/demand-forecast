@@ -67,35 +67,68 @@ Pipeline de ML end-to-end con dos modelos LightGBM especializados por horizonte,
 entrenados sobre **1,782 series temporales simultáneas** (54 tiendas × 33 familias):
 
 ```mermaid
-flowchart TB
-    subgraph DATA["Datos"]
-        A["Kaggle Store Sales<br/>4.5 años — 3,000,888 registros"] --> B["data/raw/"]
-        B -->|"dvc add + dvc push"| C["DagsHub storage<br/>remote s3://dvc"]
-        C -.->|"dvc pull"| B
+flowchart LR
+    %% ─── ESTILOS ───────────────────────────────────────────
+    classDef data    fill:#1e3a5f,stroke:#4a90d9,color:#e8f4fd
+    classDef train   fill:#1a3a2a,stroke:#4caf50,color:#e8f5e9
+    classDef mlops   fill:#3a2a1a,stroke:#ff9800,color:#fff3e0
+    classDef serve   fill:#2a1a3a,stroke:#9c27b0,color:#f3e5f5
+    classDef storage fill:#2a2a2a,stroke:#888,color:#eee,stroke-dasharray:5 5
+
+    %% ─── DATA ──────────────────────────────────────────────
+    subgraph DATA["  📦 Data  "]
+        direction TB
+        RAW["Kaggle Store Sales\n4.5 años · 3M registros"]
+        DVC["DagsHub Storage\ndvc add + dvc push/pull"]
+        RAW --> DVC
     end
 
-    subgraph TRAIN["Entrenamiento"]
-        B --> D["preprocessing.py<br/>merge 6 CSVs, nulos, log1p"]
-        D --> E["train_processed.parquet"]
-        E --> F["DemandFeatureEngineer<br/>fit() — categorías, store_stats<br/>transform() — lags, rolling, festivos, promo, transacciones<br/>(~50 features, en memoria)"]
-        F --> G["Walk-forward CV<br/>5 folds · 4 semanas"]
-        G --> H["train.py + MLflow<br/>LightGBM global h7 y h30"]
-        H --> I["lgbm_h{h}.pkl<br/>feature_pipeline_h{h}.pkl"]
+    %% ─── TRAINING ──────────────────────────────────────────
+    subgraph TRAIN["  🧠 Training  "]
+        direction TB
+        PREP["preprocessing.py\nmerge 6 CSVs · log1p · nulos"]
+        FE["DemandFeatureEngineer\nfit() — lags, rolling, festivos,\npromos, transacciones (~50 features)"]
+        CV["Walk-forward CV\n5 folds · ventana 4 semanas"]
+        TRN["train.py + MLflow\nLightGBM global h7 y h30"]
+        PKL["Artefactos serializados\nlgbm_h{}.pkl · feature_pipeline_h{}.pkl"]
+        PREP --> FE --> CV --> TRN --> PKL
     end
 
-    subgraph OPS["CI/CD & MLOps"]
-        I --> J["Model Registry<br/>MLflow / DagsHub<br/>alias @production"]
-        K["retrain.yml<br/>cron semanal · workflow_dispatch"] -->|"dvc pull"| C
-        K --> L["retrain.py<br/>staging → test set (8 sem) → comparación 1% MAE"]
-        L -->|"mejora ≥ 1%"| M["promueve + backup<br/>3 artefactos rotados"]
-        L -->|"< 1% mejora"| N["descarta staging"]
-        M --> J
+    %% ─── MLOPS ─────────────────────────────────────────────
+    subgraph MLOPS["  ⚙️ CI/CD & MLOps  "]
+        direction TB
+        CRON["retrain.yml\ncron semanal · workflow_dispatch"]
+        RTR["retrain.py\nentrena a staging · compara MAE"]
+        GATE{{"¿Mejora\n≥ 1%?"}}
+        PROMO["Promueve + backup\n3 artefactos rotados"]
+        DISC["Descarta staging"]
+        REG["Model Registry\nMLflow · DagsHub\nalias @production"]
+        CRON --> RTR --> GATE
+        GATE -- Sí --> PROMO --> REG
+        GATE -- No --> DISC
     end
 
-    subgraph SERV["Serving"]
-        I --> O["predict.py · evaluate.py<br/>.transform() con pipeline serializado<br/>(paridad train/serving garantizada)"]
-        O --> P["FastAPI<br/>POST /predict · /health"]
+    %% ─── SERVING ───────────────────────────────────────────
+    subgraph SERVE["  🚀 Serving  "]
+        direction TB
+        PRED["predict.py\n.transform() con pipeline congelado"]
+        API["FastAPI\nPOST /predict · GET /metrics · /health"]
+        DASH["Streamlit Demo\npredicciones + IC + backtest"]
+        PRED --> API
+        PRED --> DASH
     end
+
+    %% ─── CONEXIONES PRINCIPALES ────────────────────────────
+    DVC      -->|dvc pull| PREP
+    PKL      -->|staging _new| CRON
+    PKL      -->|artefactos| PRED
+    REG      -.->|recuperación\nsi faltan locales| PRED
+
+    %% ─── CLASES ────────────────────────────────────────────
+    class RAW,DVC data
+    class PREP,FE,CV,TRN,PKL train
+    class CRON,RTR,GATE,PROMO,DISC,REG mlops
+    class PRED,API,DASH serve
 ```
 
 > **Paridad train/serving:** el `DemandFeatureEngineer` se ajusta (`fit()`) una
