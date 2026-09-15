@@ -74,36 +74,36 @@ flowchart TB
     classDef serve fill:#2a1a3a,stroke:#9c27b0,color:#f3e5f5
 
     subgraph DATA[" DATA"]
-        A1["Kaggle Store Sales — 4.5 años, 3M registros"]
-        A2["DagsHub Storage — versionado con DVC"]
+        A1["Kaggle Store Sales — 4.5 años,\n3M registros"]
+        A2["DagsHub Storage —\n versionado con DVC"]
         A1 --> A2
     end
 
     subgraph TRAIN[" TRAINING"]
-        B1["preprocessing.py — merge 6 CSVs, log1p"]
-        B2["DemandFeatureEngineer — lags, rolling, festivos, promos"]
-        B3["Walk-forward CV — 5 folds, ventana 4 semanas"]
-        B4["train.py + MLflow — LightGBM global h7 y h30"]
-        B5["Artefactos — lgbm_h{}.pkl + feature_pipeline_h{}.pkl"]
+        B1["preprocessing.py —\n merge 6 CSVs, log1p"]
+        B2["DemandFeatureEngineer —\n lags, rolling, festivos, promos"]
+        B3["Walk-forward CV —\n 5 folds, ventana 4 semanas"]
+        B4["train.py + MLflow —\n LightGBM global h7 y h30"]
+        B5["Artefactos —\n lgbm_h{}.pkl + feature_pipeline_h{}.pkl"]
         B1 --> B2 --> B3 --> B4 --> B5
     end
 
     subgraph MLOPS[" CI/CD & MLOPS"]
-        C1["retrain.yml — cron semanal o manual"]
-        C2["retrain.py — entrena nuevo modelo a staging"]
+        C1["retrain.yml —\n cron semanal o manual"]
+        C2["retrain.py —\n entrena nuevo modelo a staging"]
         C3{{"¿MAE mejora ≥ 1%?"}}
-        C4["Promover — backup + reemplazar producción"]
+        C4["Promover —\n backup + reemplazar producción"]
         C5["Descartar staging"]
-        C6["Model Registry — MLflow / DagsHub @production"]
+        C6["Model Registry —\n MLflow / DagsHub @production"]
         C1 --> C2 --> C3
         C3 -- Sí --> C4 --> C6
         C3 -- No --> C5
     end
 
     subgraph SERVE[" SERVING"]
-        D1["predict.py — .transform() con pipeline congelado"]
-        D2["FastAPI — POST /predict · GET /metrics · /health"]
-        D3["Streamlit Demo — predicciones + IC + backtest"]
+        D1["predict.py —\n .transform() con pipeline congelado"]
+        D2["FastAPI —\n POST /predict · GET /metrics · /health"]
+        D3["Streamlit Demo —\n predicciones + IC + backtest"]
         D1 --> D2
         D1 --> D3
     end
