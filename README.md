@@ -73,13 +73,13 @@ flowchart TB
     classDef mlops fill:#3a2a1a,stroke:#ff9800,color:#fff3e0
     classDef serve fill:#2a1a3a,stroke:#9c27b0,color:#f3e5f5
 
-    subgraph DATA["📦 DATA"]
+    subgraph DATA[" DATA"]
         A1["Kaggle Store Sales — 4.5 años, 3M registros"]
         A2["DagsHub Storage — versionado con DVC"]
         A1 --> A2
     end
 
-    subgraph TRAIN["🧠 TRAINING"]
+    subgraph TRAIN[" TRAINING"]
         B1["preprocessing.py — merge 6 CSVs, log1p"]
         B2["DemandFeatureEngineer — lags, rolling, festivos, promos"]
         B3["Walk-forward CV — 5 folds, ventana 4 semanas"]
@@ -88,7 +88,7 @@ flowchart TB
         B1 --> B2 --> B3 --> B4 --> B5
     end
 
-    subgraph MLOPS["⚙️ CI/CD & MLOPS"]
+    subgraph MLOPS[" CI/CD & MLOPS"]
         C1["retrain.yml — cron semanal o manual"]
         C2["retrain.py — entrena nuevo modelo a staging"]
         C3{{"¿MAE mejora ≥ 1%?"}}
@@ -100,7 +100,7 @@ flowchart TB
         C3 -- No --> C5
     end
 
-    subgraph SERVE["🚀 SERVING"]
+    subgraph SERVE[" SERVING"]
         D1["predict.py — .transform() con pipeline congelado"]
         D2["FastAPI — POST /predict · GET /metrics · /health"]
         D3["Streamlit Demo — predicciones + IC + backtest"]
