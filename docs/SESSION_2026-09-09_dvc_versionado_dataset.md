@@ -9,8 +9,9 @@ DVC 3.67.0 estaba declarado en `requirements.in` pero nunca inicializado.
 **Decisiones tomadas:**
 - Alcance: solo `data/raw` (sin pipelines `dvc.yaml`).
 - Remote: DagsHub storage (S3-compatible, bucket `dvc` del repo).
-- Integración CI: sin cambios — `retrain.yml` sigue descargando de Kaggle;
-  DVC es versionado operacional local.
+- Integración CI: `retrain.yml` ahora restaura el dataset vía `dvc pull`
+  desde DagsHub storage (commit `5709b8c`), reemplazando la descarga Kaggle.
+  Auth con token DagsHub como env vars S3 (`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`).
 - Auth: reutilizar token DagsHub (mismo que MLflow) en `.dvc/config.local`.
 
 ## Archivos creados/modificados

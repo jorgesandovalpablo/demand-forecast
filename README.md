@@ -406,8 +406,8 @@ demand-forecast/
 Python 3.13+
 Git
 Docker (opcional, para deployment)
-Cuenta en DagsHub (para MLflow remoto)
-Cuenta en Kaggle (para el dataset)
+Cuenta en DagsHub (para MLflow + dataset vía DVC)
+Cuenta en Kaggle (opcional, solo si descargas manualmente)
 ```
 
 ### 1. Clonar el repositorio
@@ -811,6 +811,7 @@ contribución media absoluta a las predicciones.
   `dvc push`. Auth vía token DagsHub en `.dvc/config.local` (no versionado).
   Remote endpoint: `dagshub.com/jorgesandovalpablo/demand-forecast.s3`.
 - **dvc-s3:** añadido a `requirements.txt` (dependencia S3 para DVC).
+- **CI retrain:** dataset restaurado con `dvc pull` desde DagsHub storage en `retrain.yml` (reemplaza descarga Kaggle).
 - **pyproject.toml:** versión 0.7.0 → 0.8.0.
 
 ### v0.7.0 (2026-09-08)

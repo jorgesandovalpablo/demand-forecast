@@ -14,7 +14,8 @@ Requisitos previos:
 ## Paso 0 — Tests y linting (sin datos)
 
 ```bash
-pytest tests/ -v --tb=short          # 81 tests esperados en verde
+pytest tests/ --ignore=tests/integration -q     # 184 tests esperados (unit)
+# tests/integration/ requiere artefactos (se corren después de entrenamiento)
 flake8 --select=F src/ tests/        # sin salida = limpio
 ```
 
@@ -138,7 +139,7 @@ curl -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8000/predict \
 
 ## Checklist final
 
-- [ ] 81 tests en verde + flake8 limpio
+- [ ] 184 tests unitarios en verde + flake8 limpio
 - [ ] Artefactos v0.2 regenerados para h7 y h30
 - [ ] Métricas capturadas y pegadas en README
 - [ ] Backups de retraining presentes y staging limpio
