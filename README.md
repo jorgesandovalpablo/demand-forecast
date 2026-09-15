@@ -67,68 +67,56 @@ Pipeline de ML end-to-end con dos modelos LightGBM especializados por horizonte,
 entrenados sobre **1,782 series temporales simultáneas** (54 tiendas × 33 familias):
 
 ```mermaid
-flowchart LR
-    %% ─── ESTILOS ───────────────────────────────────────────
-    classDef data    fill:#1e3a5f,stroke:#4a90d9,color:#e8f4fd
-    classDef train   fill:#1a3a2a,stroke:#4caf50,color:#e8f5e9
-    classDef mlops   fill:#3a2a1a,stroke:#ff9800,color:#fff3e0
-    classDef serve   fill:#2a1a3a,stroke:#9c27b0,color:#f3e5f5
-    classDef storage fill:#2a2a2a,stroke:#888,color:#eee,stroke-dasharray:5 5
+flowchart TB
+    classDef data  fill:#1e3a5f,stroke:#4a90d9,color:#e8f4fd
+    classDef train fill:#1a3a2a,stroke:#4caf50,color:#e8f5e9
+    classDef mlops fill:#3a2a1a,stroke:#ff9800,color:#fff3e0
+    classDef serve fill:#2a1a3a,stroke:#9c27b0,color:#f3e5f5
 
-    %% ─── DATA ──────────────────────────────────────────────
-    subgraph DATA["  📦 Data  "]
-        direction TB
-        RAW["Kaggle Store Sales\n4.5 años · 3M registros"]
-        DVC["DagsHub Storage\ndvc add + dvc push/pull"]
-        RAW --> DVC
+    subgraph DATA["📦 DATA"]
+        A1["Kaggle Store Sales — 4.5 años, 3M registros"]
+        A2["DagsHub Storage — versionado con DVC"]
+        A1 --> A2
     end
 
-    %% ─── TRAINING ──────────────────────────────────────────
-    subgraph TRAIN["  🧠 Training  "]
-        direction TB
-        PREP["preprocessing.py\nmerge 6 CSVs · log1p · nulos"]
-        FE["DemandFeatureEngineer\nfit() — lags, rolling, festivos,\npromos, transacciones (~50 features)"]
-        CV["Walk-forward CV\n5 folds · ventana 4 semanas"]
-        TRN["train.py + MLflow\nLightGBM global h7 y h30"]
-        PKL["Artefactos serializados\nlgbm_h{}.pkl · feature_pipeline_h{}.pkl"]
-        PREP --> FE --> CV --> TRN --> PKL
+    subgraph TRAIN["🧠 TRAINING"]
+        B1["preprocessing.py — merge 6 CSVs, log1p"]
+        B2["DemandFeatureEngineer — lags, rolling, festivos, promos"]
+        B3["Walk-forward CV — 5 folds, ventana 4 semanas"]
+        B4["train.py + MLflow — LightGBM global h7 y h30"]
+        B5["Artefactos — lgbm_h{}.pkl + feature_pipeline_h{}.pkl"]
+        B1 --> B2 --> B3 --> B4 --> B5
     end
 
-    %% ─── MLOPS ─────────────────────────────────────────────
-    subgraph MLOPS["  ⚙️ CI/CD & MLOps  "]
-        direction TB
-        CRON["retrain.yml\ncron semanal · workflow_dispatch"]
-        RTR["retrain.py\nentrena a staging · compara MAE"]
-        GATE{{"¿Mejora\n≥ 1%?"}}
-        PROMO["Promueve + backup\n3 artefactos rotados"]
-        DISC["Descarta staging"]
-        REG["Model Registry\nMLflow · DagsHub\nalias @production"]
-        CRON --> RTR --> GATE
-        GATE -- Sí --> PROMO --> REG
-        GATE -- No --> DISC
+    subgraph MLOPS["⚙️ CI/CD & MLOPS"]
+        C1["retrain.yml — cron semanal o manual"]
+        C2["retrain.py — entrena nuevo modelo a staging"]
+        C3{{"¿MAE mejora ≥ 1%?"}}
+        C4["Promover — backup + reemplazar producción"]
+        C5["Descartar staging"]
+        C6["Model Registry — MLflow / DagsHub @production"]
+        C1 --> C2 --> C3
+        C3 -- Sí --> C4 --> C6
+        C3 -- No --> C5
     end
 
-    %% ─── SERVING ───────────────────────────────────────────
-    subgraph SERVE["  🚀 Serving  "]
-        direction TB
-        PRED["predict.py\n.transform() con pipeline congelado"]
-        API["FastAPI\nPOST /predict · GET /metrics · /health"]
-        DASH["Streamlit Demo\npredicciones + IC + backtest"]
-        PRED --> API
-        PRED --> DASH
+    subgraph SERVE["🚀 SERVING"]
+        D1["predict.py — .transform() con pipeline congelado"]
+        D2["FastAPI — POST /predict · GET /metrics · /health"]
+        D3["Streamlit Demo — predicciones + IC + backtest"]
+        D1 --> D2
+        D1 --> D3
     end
 
-    %% ─── CONEXIONES PRINCIPALES ────────────────────────────
-    DVC      -->|dvc pull| PREP
-    PKL      -->|staging _new| CRON
-    PKL      -->|artefactos| PRED
-    REG      -.->|recuperación\nsi faltan locales| PRED
+    A2 --> B1
+    B5 --> C1
+    B5 --> D1
+    C6 -. "recuperación si faltan artefactos locales" .-> D1
 
-    %% ─── CLASES ────────────────────────────────────────────
-    class RAW,DVC data
-    class PREP,FE,CV,TRN,PKL train
-    class CRON,RTR,GATE,PROMO,DISC,REG mlops
-    class PRED,API,DASH serve
+    class A1,A2 data
+    class B1,B2,B3,B4,B5 train
+    class C1,C2,C3,C4,C5,C6 mlops
+    class D1,D2,D3 serve
 ```
 
 > **Paridad train/serving:** el `DemandFeatureEngineer` se ajusta (`fit()`) una
